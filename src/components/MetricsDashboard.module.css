@@ -1,0 +1,225 @@
+.dashboardContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.goalsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.goalCard {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 220px;
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg-light);
+}
+
+.editBtn {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--glass-border);
+  color: var(--primary-neon);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.editBtn:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: rgba(2, 132, 199, 0.25);
+}
+
+.goalBody {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.progressRingWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+}
+
+.progressRingBg {
+  fill: transparent;
+  stroke: rgba(15, 23, 42, 0.05);
+}
+
+.progressRingCircle {
+  fill: transparent;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.5s ease-out;
+}
+
+.colorCyan {
+  stroke: var(--primary-neon);
+  filter: drop-shadow(0 0 3px rgba(2, 132, 199, 0.2));
+}
+
+.colorViolet {
+  stroke: var(--secondary-neon);
+  filter: drop-shadow(0 0 3px rgba(124, 58, 237, 0.2));
+}
+
+.progressValue {
+  position: absolute;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg-light);
+}
+
+.goalStats {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.statLabel {
+  color: var(--fg-muted);
+}
+
+.statValue {
+  color: var(--fg-light);
+}
+
+.progressBarBg {
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bgCyan {
+  background: var(--primary-neon);
+  box-shadow: 0 0 4px rgba(2, 132, 199, 0.2);
+}
+
+.bgViolet {
+  background: var(--secondary-neon);
+  box-shadow: 0 0 4px rgba(124, 58, 237, 0.2);
+}
+
+.noGoal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  padding: 20px 0;
+  flex-grow: 1;
+}
+
+.noGoal p {
+  color: var(--fg-muted);
+  font-size: 14px;
+}
+
+/* HISTÓRICOS */
+.statsCard {
+  padding: 24px;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.statBox {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.boxLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.boxValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--fg-light);
+}
+
+.boxUnit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .goalsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .goalBody {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .progressRingWrapper {
+    align-self: center;
+  }
+}

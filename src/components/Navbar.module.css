@@ -1,0 +1,106 @@
+.header {
+  position: sticky;
+  top: 16px;
+  margin: 16px auto;
+  width: calc(100% - 32px);
+  max-width: 1200px;
+  z-index: 100;
+  border-radius: 16px !important;
+  padding: 12px 24px;
+}
+
+.container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoIcon {
+  width: 28px;
+  height: 28px;
+  color: var(--primary-neon);
+  filter: drop-shadow(0 0 4px rgba(2, 132, 199, 0.25));
+  animation: float 3s ease-in-out infinite;
+}
+
+.logoText {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.statusBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--glass-border);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dotSynced {
+  background-color: var(--success-neon);
+  box-shadow: 0 0 8px var(--success-neon);
+}
+
+.dotLocal {
+  background-color: var(--secondary-neon);
+  box-shadow: 0 0 8px var(--secondary-neon);
+}
+
+.statusTextMobile {
+  display: none;
+}
+
+.statusTextDesktop {
+  display: inline;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 600px) {
+  .header {
+    top: 8px;
+    margin: 8px auto;
+    width: calc(100% - 16px);
+    padding: 10px 16px;
+  }
+  
+  .logoText {
+    font-size: 18px;
+  }
+  
+  .logoIcon {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .statusTextDesktop {
+    display: none;
+  }
+  
+  .statusTextMobile {
+    display: inline;
+  }
+}
