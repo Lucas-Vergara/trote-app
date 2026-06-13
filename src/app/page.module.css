@@ -117,6 +117,59 @@
   width: 100%;
 }
 
+.planSection {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+/* TABS NAVEGACIÓN */
+.tabsContainer {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.tabsWrapper {
+  display: flex;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 6px;
+  border-radius: 16px;
+  gap: 6px;
+  width: fit-content;
+}
+
+.tabBtn {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  padding: 10px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: var(--transition-smooth);
+}
+
+.tabBtn:hover {
+  color: var(--fg-light);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.activeTabBtn {
+  background: #ffffff !important;
+  color: var(--primary-neon) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.08);
+}
+
+.tabIcon {
+  width: 18px;
+  height: 18px;
+}
+
 @media (max-width: 600px) {
   .alertBanner {
     flex-direction: column;
@@ -126,5 +179,22 @@
   
   .bannerCloseBtn {
     align-self: flex-start;
+  }
+  
+  .tabsWrapper {
+    width: 100%;
+  }
+  
+  .tabBtn {
+    flex: 1;
+    justify-content: center;
+    padding: 10px 8px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  
+  .tabIcon {
+    width: 16px;
+    height: 16px;
   }
 }

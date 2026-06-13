@@ -7,15 +7,32 @@ interface Run {
   distance: number;
   duration: number;
   notes?: string;
+  type?: string;
+  plan_week?: number | null;
+  plan_day?: number | null;
+  avg_bpm?: number | null;
 }
 
 interface RunModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (runData: { id?: string; date: string; distance: number; duration: number; notes: string }) => void;
+  onSubmit: (runData: {
+    id?: string;
+    date: string;
+    distance: number;
+    duration: number;
+    notes: string;
+    type: string;
+    plan_week?: number | null;
+    plan_day?: number | null;
+    avg_bpm?: number | null;
+  }) => void;
   onDelete?: (id: string) => void;
   selectedDate: string;
   existingRun: Run | null;
+  defaultType?: string;
+  defaultPlanWeek?: number | null;
+  defaultPlanDay?: number | null;
 }
 
 export default function RunModal({
@@ -24,12 +41,19 @@ export default function RunModal({
   onSubmit,
   onDelete,
   selectedDate,
-  existingRun
+  existingRun,
+  defaultType = 'run',
+  defaultPlanWeek = null,
+  defaultPlanDay = null
 }: RunModalProps) {
   const [date, setDate] = useState('');
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
   const [notes, setNotes] = useState('');
+  const [type, setType] = useState('run');
+  const [avgBpm, setAvgBpm] = useState('');
+  const [planWeek, setPlanWeek] = useState<number | null>(null);
+  const [planDay, setPlanDay] = useState<number | null>(null);
 
   useEffect(() => {
     if (existingRun) {
@@ -37,13 +61,21 @@ export default function RunModal({
       setDistance(existingRun.distance.toString());
       setDuration(existingRun.duration.toString());
       setNotes(existingRun.notes || '');
+      setType(existingRun.type || 'run');
+      setAvgBpm(existingRun.avg_bpm?.toString() || '');
+      setPlanWeek(existingRun.plan_week ?? null);
+      setPlanDay(existingRun.plan_day ?? null);
     } else {
       setDate(selectedDate);
       setDistance('');
       setDuration('');
       setNotes('');
+      setType(defaultType);
+      setAvgBpm('');
+      setPlanWeek(defaultPlanWeek);
+      setPlanDay(defaultPlanDay);
     }
-  }, [existingRun, selectedDate, isOpen]);
+  }, [existingRun, selectedDate, isOpen, defaultType, defaultPlanWeek, defaultPlanDay]);
 
   if (!isOpen) return null;
 
@@ -56,6 +88,7 @@ export default function RunModal({
 
     const distNum = parseFloat(distance);
     const durNum = parseInt(duration, 10);
+    const bpmNum = avgBpm ? parseInt(avgBpm, 10) : null;
 
     if (isNaN(distNum) || distNum <= 0) {
       alert('La distancia debe ser un número positivo.');
@@ -67,12 +100,21 @@ export default function RunModal({
       return;
     }
 
+    if (bpmNum !== null && (isNaN(bpmNum) || bpmNum <= 0)) {
+      alert('Las pulsaciones (BPM) deben ser un número positivo.');
+      return;
+    }
+
     onSubmit({
       id: existingRun?.id,
       date,
       distance: distNum,
       duration: durNum,
-      notes
+      notes,
+      type,
+      plan_week: planWeek,
+      plan_day: planDay,
+      avg_bpm: bpmNum
     });
     onClose();
   };
@@ -86,12 +128,15 @@ export default function RunModal({
     }
   };
 
+  const showBpmWarning = avgBpm && parseInt(avgBpm, 10) > 145;
+
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={`${styles.modal} glass-panel fade-in`} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
-            {existingRun ? 'Editar Entrenamiento' : 'Registrar Entrenamiento'}
+            {existingRun ? 'Editar Sesión' : 'Registrar Sesión'}
+            {planWeek && ` (Semana ${planWeek} - Día ${planDay})`}
           </h2>
           <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={styles.closeIcon}>
@@ -102,16 +147,34 @@ export default function RunModal({
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className="form-group">
-            <label htmlFor="run-date">Fecha</label>
-            <input
-              id="run-date"
-              type="date"
-              className="form-control"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              required
-            />
+          <div className={styles.formRow}>
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="run-date">Fecha</label>
+              <input
+                id="run-date"
+                type="date"
+                className="form-control"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group" style={{ flex: 1 }}>
+              <label htmlFor="run-type">Tipo de Actividad</label>
+              <select
+                id="run-type"
+                className="form-control"
+                value={type}
+                onChange={e => setType(e.target.value)}
+                required
+              >
+                <option value="run">Trote General</option>
+                <option value="interval">Trote (Intervalos)</option>
+                <option value="rucking">Rucking (Carga)</option>
+                <option value="fondo">Trote (Fondo)</option>
+              </select>
+            </div>
           </div>
 
           <div className={styles.formRow}>
@@ -146,11 +209,31 @@ export default function RunModal({
           </div>
 
           <div className="form-group">
+            <label htmlFor="run-bpm">Frecuencia Cardíaca Promedio (BPM)</label>
+            <input
+              id="run-bpm"
+              type="number"
+              min="40"
+              max="220"
+              placeholder="ej. 138 (Opcional)"
+              className="form-control"
+              value={avgBpm}
+              onChange={e => setAvgBpm(e.target.value)}
+            />
+          </div>
+
+          {showBpmWarning && (
+            <div className={styles.bpmAlert}>
+              ⚠️ <strong>Límite de Pulso Superado (145 BPM):</strong> El Plan Base indica que si tus BPM superan los 145, debes caminar hasta que bajen de 130. Recuerda mantener un control estricto de tu reloj.
+            </div>
+          )}
+
+          <div className="form-group">
             <label htmlFor="run-notes">Notas / ¿Cómo te sentiste?</label>
             <textarea
               id="run-notes"
               rows={3}
-              placeholder="ej. Buen ritmo, me sentí con energía. Clima fresco."
+              placeholder="ej. Trote suave. Controlé el pulso al subir pendientes."
               className="form-control"
               style={{ resize: 'none' }}
               value={notes}

@@ -6,6 +6,7 @@ import MetricsDashboard from '@/components/MetricsDashboard';
 import RunCalendar from '@/components/RunCalendar';
 import RunModal from '@/components/RunModal';
 import GoalsModal from '@/components/GoalsModal';
+import TrainingPlan from '@/components/TrainingPlan';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import styles from './page.module.css';
 
@@ -15,6 +16,10 @@ interface Run {
   distance: number;
   duration: number;
   notes?: string;
+  type?: string;
+  plan_week?: number | null;
+  plan_day?: number | null;
+  avg_bpm?: number | null;
 }
 
 interface Goal {
@@ -35,10 +40,18 @@ export default function Home() {
   const [useLocalMode, setUseLocalMode] = useState(!isSupabaseConfigured);
   const [dbError, setDbError] = useState<string | null>(null);
 
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<'progress' | 'plan'>('progress');
+
   // Modals state
   const [isRunModalOpen, setIsRunModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [editingRun, setEditingRun] = useState<Run | null>(null);
+
+  // Hidden plan contexts for RunModal
+  const [planDefaultType, setPlanDefaultType] = useState('run');
+  const [planDefaultWeek, setPlanDefaultWeek] = useState<number | null>(null);
+  const [planDefaultDay, setPlanDefaultDay] = useState<number | null>(null);
 
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [selectedGoalType, setSelectedGoalType] = useState<'weekly' | 'monthly'>('weekly');
@@ -90,7 +103,7 @@ export default function Home() {
     loadData();
   }, [useLocalMode]);
 
-  // Load from localStorage (with beautiful default mock data if empty)
+  // Load from localStorage (with default mock data if empty)
   const loadLocalData = () => {
     try {
       const cachedRuns = localStorage.getItem('trote_runs');
@@ -109,9 +122,9 @@ export default function Home() {
         };
 
         const mockRuns: Run[] = [
-          { date: formatDateOffset(1), distance: 5.4, duration: 28, notes: 'Buen trote suave, excelente clima fresco.' },
-          { date: formatDateOffset(3), distance: 8.2, duration: 45, notes: 'Trote de fondo a ritmo moderado. Muy buenas sensaciones.' },
-          { date: formatDateOffset(6), distance: 4.0, duration: 22, notes: 'Entrenamiento corto de velocidad y pasadas.' },
+          { date: formatDateOffset(1), distance: 5.4, duration: 28, notes: 'Buen trote suave, excelente clima fresco.', type: 'run', avg_bpm: 135 },
+          { date: formatDateOffset(3), distance: 8.2, duration: 45, notes: 'Trote de fondo a ritmo moderado. Muy buenas sensaciones.', type: 'run', avg_bpm: 138 },
+          { date: formatDateOffset(6), distance: 4.0, duration: 22, notes: 'Entrenamiento corto de velocidad y pasadas.', type: 'run', avg_bpm: 142 },
         ];
         setRuns(mockRuns);
         localStorage.setItem('trote_runs', JSON.stringify(mockRuns));
@@ -160,7 +173,17 @@ export default function Home() {
   };
 
   // Run Mutations: Add/Edit
-  const handleRunSubmit = async (runData: { id?: string; date: string; distance: number; duration: number; notes: string }) => {
+  const handleRunSubmit = async (runData: {
+    id?: string;
+    date: string;
+    distance: number;
+    duration: number;
+    notes: string;
+    type: string;
+    plan_week?: number | null;
+    plan_day?: number | null;
+    avg_bpm?: number | null;
+  }) => {
     if (useLocalMode) {
       let updatedRuns;
       if (runData.id) {
@@ -186,7 +209,11 @@ export default function Home() {
               date: runData.date,
               distance: runData.distance,
               duration: runData.duration,
-              notes: runData.notes
+              notes: runData.notes,
+              type: runData.type,
+              plan_week: runData.plan_week,
+              plan_day: runData.plan_day,
+              avg_bpm: runData.avg_bpm
             })
             .eq('id', runData.id);
           if (error) throw error;
@@ -197,7 +224,11 @@ export default function Home() {
               date: runData.date,
               distance: runData.distance,
               duration: runData.duration,
-              notes: runData.notes
+              notes: runData.notes,
+              type: runData.type,
+              plan_week: runData.plan_week,
+              plan_day: runData.plan_day,
+              avg_bpm: runData.avg_bpm
             }]);
           if (error) throw error;
         }
@@ -207,7 +238,7 @@ export default function Home() {
         setRuns(data || []);
       } catch (err) {
         console.error('Error guardando en Supabase:', err);
-        alert('Error al guardar en la nube. Revisa la consola o usa el modo local.');
+        alert('Error al guardar en la nube. Los datos no se sincronizaron.');
       }
       setIsLoading(false);
     }
@@ -289,8 +320,13 @@ export default function Home() {
     }
   };
 
-  // Modal Triggers
+  // Modal Triggers for Calendar / Quick Log
   const handleSelectDate = (dateStr: string, existingRun?: Run) => {
+    // Reset plan contextual defaults so we don't accidentally link them
+    setPlanDefaultWeek(null);
+    setPlanDefaultDay(null);
+    setPlanDefaultType('run');
+
     setSelectedDate(dateStr);
     setEditingRun(existingRun || null);
     setIsRunModalOpen(true);
@@ -299,6 +335,22 @@ export default function Home() {
   const handleQuickLog = () => {
     const todayStr = new Date().toISOString().split('T')[0];
     handleSelectDate(todayStr);
+  };
+
+  // Modal Trigger for Plan Workouts
+  const handleSelectPlanWorkout = (
+    weekNum: number,
+    dayNum: number,
+    workoutType: string,
+    existingRun?: Run
+  ) => {
+    setPlanDefaultWeek(weekNum);
+    setPlanDefaultDay(dayNum);
+    setPlanDefaultType(workoutType);
+
+    setSelectedDate(existingRun ? existingRun.date : new Date().toISOString().split('T')[0]);
+    setEditingRun(existingRun || null);
+    setIsRunModalOpen(true);
   };
 
   const handleEditGoals = (type: 'weekly' | 'monthly') => {
@@ -320,7 +372,7 @@ export default function Home() {
             <div className={styles.alertContent}>
               <p className={styles.alertTitle}>Aplicación Ejecutándose en Modo Local</p>
               <p className={styles.alertText}>
-                Tus datos están guardados localmente en este dispositivo. Para sincronizarlos entre tu celular y computador en la nube, duplica el archivo <code>.env.local.example</code> como <code>.env.local</code> y configura tus credenciales de Supabase.
+                Tus datos están guardados localmente en este dispositivo. Para sincronizarlos entre tu celular y computador en la nube, configura tus credenciales de Supabase en un archivo <code>.env.local</code>.
               </p>
             </div>
           </div>
@@ -332,7 +384,7 @@ export default function Home() {
             <div className={styles.alertContent}>
               <p className={styles.alertTitle}>Base de Datos No Configurada</p>
               <p className={styles.alertText}>
-                No pudimos acceder a las tablas de Supabase. Recuerda copiar y ejecutar el script SQL de <code>supabase_schema.sql</code> en el **SQL Editor** de tu consola de Supabase.
+                No pudimos acceder a las tablas de Supabase. Recuerda copiar y ejecutar el script SQL de <code>supabase_schema.sql</code> en el panel de control de Supabase.
               </p>
             </div>
             <button className={styles.bannerCloseBtn} onClick={() => setUseLocalMode(true)}>
@@ -342,23 +394,66 @@ export default function Home() {
         )}
       </div>
 
-      {/* CONTENIDO PRINCIPAL */}
-      <div className={styles.dashboardSection}>
-        <MetricsDashboard
-          runs={runs}
-          weeklyGoal={weeklyGoal}
-          monthlyGoal={monthlyGoal}
-          onEditGoals={handleEditGoals}
-        />
+      {/* PESTAÑAS DE NAVEGACIÓN PRINCIPAL */}
+      <div className={styles.tabsContainer}>
+        <div className={`${styles.tabsWrapper} glass-panel fade-in`}>
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'progress' ? styles.activeTabBtn : ''}`}
+            onClick={() => setActiveTab('progress')}
+          >
+            <svg className={styles.tabIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 3v18h18" />
+              <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3" />
+            </svg>
+            <span>Mi Progreso y Calendario</span>
+          </button>
+          
+          <button
+            className={`${styles.tabBtn} ${activeTab === 'plan' ? styles.activeTabBtn : ''}`}
+            onClick={() => setActiveTab('plan')}
+          >
+            <svg className={styles.tabIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+            <span>Plan de Entrenamiento 10K</span>
+          </button>
+        </div>
       </div>
 
-      <div className={styles.calendarSection}>
-        <RunCalendar
-          runs={runs}
-          onSelectDate={handleSelectDate}
-          onQuickLog={handleQuickLog}
-        />
-      </div>
+      {/* VISTA 1: PROGRESO Y CALENDARIO */}
+      {activeTab === 'progress' && (
+        <>
+          <div className={styles.dashboardSection}>
+            <MetricsDashboard
+              runs={runs}
+              weeklyGoal={weeklyGoal}
+              monthlyGoal={monthlyGoal}
+              onEditGoals={handleEditGoals}
+            />
+          </div>
+
+          <div className={styles.calendarSection}>
+            <RunCalendar
+              runs={runs}
+              onSelectDate={handleSelectDate}
+              onQuickLog={handleQuickLog}
+            />
+          </div>
+        </>
+      )}
+
+      {/* VISTA 2: PLAN 10K */}
+      {activeTab === 'plan' && (
+        <div className={styles.planSection}>
+          <TrainingPlan
+            runs={runs}
+            onSelectPlanWorkout={handleSelectPlanWorkout}
+          />
+        </div>
+      )}
 
       {/* CARGANDO OVERLAY */}
       {isLoading && (
@@ -373,6 +468,9 @@ export default function Home() {
         onClose={() => setIsRunModalOpen(false)}
         selectedDate={selectedDate}
         existingRun={editingRun}
+        defaultType={planDefaultType}
+        defaultPlanWeek={planDefaultWeek}
+        defaultPlanDay={planDefaultDay}
         onSubmit={handleRunSubmit}
         onDelete={handleRunDelete}
       />
