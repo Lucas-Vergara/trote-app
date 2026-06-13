@@ -30,8 +30,27 @@ const cleanSupabaseKey = (key: string): string => {
 const supabaseUrl = cleanSupabaseUrl(rawUrl);
 const supabaseAnonKey = cleanSupabaseKey(rawKey);
 
+// Stricter URL validation helper to prevent malformed URLs from crashing the client
+const isValidSupabaseUrl = (urlStr: string): boolean => {
+  if (!urlStr) return false;
+  try {
+    const parsed = new URL(urlStr);
+    return (
+      (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+      parsed.hostname.includes('.') &&
+      parsed.hostname.length > 4
+    );
+  } catch {
+    return false;
+  }
+};
+
 // It is configured if we have a valid-looking URL and key after cleaning
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl && 
+  supabaseAnonKey && 
+  isValidSupabaseUrl(supabaseUrl)
+);
 
 const finalUrl = isSupabaseConfigured ? supabaseUrl : 'https://placeholder-project.supabase.co';
 const finalKey = isSupabaseConfigured ? supabaseAnonKey : 'placeholder-anon-key';
