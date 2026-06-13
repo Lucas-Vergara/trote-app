@@ -412,21 +412,6 @@ export default function Home() {
       <main className={styles.mainContainer}>
         <Navbar isCloudSynced={false} />
         
-        <div className={styles.infoArea}>
-          <div className={`${styles.alertBanner} glass-panel fade-in`}>
-            <div className={styles.alertIcon}>🔑</div>
-            <div className={styles.alertContent}>
-              <p className={styles.alertTitle}>Inicio de Sesión Requerido</p>
-              <p className={styles.alertText}>
-                Esta aplicación está configurada con base de datos en la nube. Por favor inicia sesión o crea una cuenta para ver y sincronizar tus entrenamientos.
-              </p>
-            </div>
-            <button className={styles.bannerCloseBtn} onClick={() => setUseLocalMode(true)}>
-              Usar Modo Local (Offline)
-            </button>
-          </div>
-        </div>
-
         <AuthForm 
           onAuthSuccess={() => console.log('Autenticación exitosa')} 
           onGuestAccess={() => setUseLocalMode(true)}

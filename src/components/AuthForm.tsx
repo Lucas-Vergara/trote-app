@@ -178,9 +178,9 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
         <p className={styles.securityNote}>
           {isLogin ? (
-            'Ingresa tus credenciales autorizadas.'
+            <span>¿Quieres probar la app sin registrarte? Presiona <strong>Entrar como Invitado</strong> para probar todas las funciones usando el almacenamiento local de tu navegador.</span>
           ) : (
-            'Nota: Puedes desactivar los registros libres desde el panel de Supabase en Authentication > Providers para hacer tu app 100% privada.'
+            <span>¿Prefieres no crear una cuenta? Puedes entrar como <strong>Invitado</strong> para probar todo localmente de forma privada.</span>
           )}
         </p>
       </div>
