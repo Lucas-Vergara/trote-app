@@ -167,12 +167,16 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
           <button
             type="button"
-            className="btn-secondary"
+            className={styles.guestBtn}
             style={{ width: '100%', marginTop: '12px' }}
             onClick={onGuestAccess}
             disabled={loading}
           >
-            Entrar como Invitado (Datos Locales)
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Entrar como Invitado (Probar de forma Local)
           </button>
         </form>
 
