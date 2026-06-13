@@ -7,6 +7,7 @@ import RunCalendar from '@/components/RunCalendar';
 import RunModal from '@/components/RunModal';
 import GoalsModal from '@/components/GoalsModal';
 import TrainingPlan from '@/components/TrainingPlan';
+import AuthForm from '@/components/AuthForm';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import styles from './page.module.css';
 
@@ -40,6 +41,9 @@ export default function Home() {
   const [useLocalMode, setUseLocalMode] = useState(!isSupabaseConfigured);
   const [dbError, setDbError] = useState<string | null>(null);
 
+  // Auth State
+  const [user, setUser] = useState<any | null>(null);
+
   // Navigation State
   const [activeTab, setActiveTab] = useState<'progress' | 'plan'>('progress');
 
@@ -56,14 +60,45 @@ export default function Home() {
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [selectedGoalType, setSelectedGoalType] = useState<'weekly' | 'monthly'>('weekly');
 
-  // Load initial data
+  // Listen for Auth State Changes
+  useEffect(() => {
+    if (isSupabaseConfigured) {
+      // Get current session on load
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          setUseLocalMode(false);
+        }
+      });
+
+      // Subscribe to updates
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          setUseLocalMode(false);
+        } else {
+          // Reset data when logging out
+          setRuns([]);
+          setWeeklyGoal(null);
+          setMonthlyGoal(null);
+        }
+      });
+
+      return () => subscription.unsubscribe();
+    }
+  }, []);
+
+  // Load data based on Auth / Local Mode
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       
-      if (isSupabaseConfigured && !useLocalMode) {
+      if (isSupabaseConfigured && !useLocalMode && user) {
         try {
-          // Fetch runs
+          // Fetch runs for the active user (RLS will automatically enforce user filter,
+          // but we can query directly)
           const { data: runsData, error: runsError } = await supabase
             .from('runs')
             .select('*')
@@ -94,14 +129,14 @@ export default function Home() {
           setUseLocalMode(true);
           loadLocalData();
         }
-      } else {
+      } else if (useLocalMode) {
         loadLocalData();
       }
       setIsLoading(false);
     }
 
     loadData();
-  }, [useLocalMode]);
+  }, [useLocalMode, user]);
 
   // Load from localStorage (with default mock data if empty)
   const loadLocalData = () => {
@@ -218,6 +253,7 @@ export default function Home() {
             .eq('id', runData.id);
           if (error) throw error;
         } else {
+          // user_id is automatically assigned by auth.uid() DEFAULT in database schema
           const { error } = await supabase
             .from('runs')
             .insert([{
@@ -296,6 +332,7 @@ export default function Home() {
             .eq('id', goalData.id);
           if (error) throw error;
         } else {
+          // user_id is automatically assigned by auth.uid() DEFAULT in database schema
           const { error } = await supabase
             .from('goals')
             .insert([{
@@ -316,6 +353,15 @@ export default function Home() {
         console.error('Error guardando meta en Supabase:', err);
         alert('Error al guardar la meta en la nube.');
       }
+      setIsLoading(false);
+    }
+  };
+
+  // Logout Handler
+  const handleLogout = async () => {
+    if (isSupabaseConfigured) {
+      setIsLoading(true);
+      await supabase.auth.signOut();
       setIsLoading(false);
     }
   };
@@ -360,9 +406,39 @@ export default function Home() {
 
   const activeGoalForModal = selectedGoalType === 'weekly' ? weeklyGoal : monthlyGoal;
 
+  // ROUTE PROTECTION: Show login page if Supabase is active, but we are not logged in and not in local mode
+  if (isSupabaseConfigured && !useLocalMode && !user && !isLoading) {
+    return (
+      <main className={styles.mainContainer}>
+        <Navbar isCloudSynced={false} />
+        
+        <div className={styles.infoArea}>
+          <div className={`${styles.alertBanner} glass-panel fade-in`}>
+            <div className={styles.alertIcon}>🔑</div>
+            <div className={styles.alertContent}>
+              <p className={styles.alertTitle}>Inicio de Sesión Requerido</p>
+              <p className={styles.alertText}>
+                Esta aplicación está configurada con base de datos en la nube. Por favor inicia sesión o crea una cuenta para ver y sincronizar tus entrenamientos.
+              </p>
+            </div>
+            <button className={styles.bannerCloseBtn} onClick={() => setUseLocalMode(true)}>
+              Usar Modo Local (Offline)
+            </button>
+          </div>
+        </div>
+
+        <AuthForm onAuthSuccess={() => console.log('Autenticación exitosa')} />
+      </main>
+    );
+  }
+
   return (
     <main className={styles.mainContainer}>
-      <Navbar isCloudSynced={!useLocalMode} />
+      <Navbar 
+        isCloudSynced={!useLocalMode} 
+        userEmail={useLocalMode ? null : user?.email}
+        onLogout={handleLogout}
+      />
 
       {/* ALERTAS Y MENSAJES DE ESTADO */}
       <div className={styles.infoArea}>
@@ -384,7 +460,7 @@ export default function Home() {
             <div className={styles.alertContent}>
               <p className={styles.alertTitle}>Base de Datos No Configurada</p>
               <p className={styles.alertText}>
-                No pudimos acceder a las tablas de Supabase. Recuerda copiar y ejecutar el script SQL de <code>supabase_schema.sql</code> en el panel de control de Supabase.
+                No pudimos acceder a las tablas de Supabase. Recuerda copiar y ejecutar el script SQL en el panel de control de Supabase.
               </p>
             </div>
             <button className={styles.bannerCloseBtn} onClick={() => setUseLocalMode(true)}>
