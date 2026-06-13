@@ -157,8 +157,37 @@
   height: 14px;
 }
 
+.loginBtn {
+  background: rgba(2, 132, 199, 0.08);
+  border: 1px solid rgba(2, 132, 199, 0.2);
+  color: var(--primary-neon);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: var(--transition-smooth);
+}
+
+.loginBtn:hover {
+  background: rgba(2, 132, 199, 0.18);
+  border-color: var(--primary-neon);
+  transform: translateY(-1px);
+}
+
+.loginIcon {
+  width: 14px;
+  height: 14px;
+}
+
 @media (max-width: 600px) {
   .userEmail {
+    display: none;
+  }
+  .loginText {
     display: none;
   }
 }

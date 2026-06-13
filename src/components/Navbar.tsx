@@ -5,9 +5,10 @@ interface NavbarProps {
   isCloudSynced: boolean;
   userEmail?: string | null;
   onLogout?: () => void;
+  onLoginClick?: () => void;
 }
 
-export default function Navbar({ isCloudSynced, userEmail, onLogout }: NavbarProps) {
+export default function Navbar({ isCloudSynced, userEmail, onLogout, onLoginClick }: NavbarProps) {
   // Extract name prefix from email (e.g. lucas@example.com -> lucas)
   const displayName = userEmail ? userEmail.split('@')[0] : '';
 
@@ -46,6 +47,17 @@ export default function Navbar({ isCloudSynced, userEmail, onLogout }: NavbarPro
               </>
             )}
           </div>
+
+          {!isCloudSynced && onLoginClick && (
+            <button className={styles.loginBtn} onClick={onLoginClick} aria-label="Conectar nube">
+              <svg className={styles.loginIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                <polyline points="10 17 15 12 10 7" />
+                <line x1="15" y1="12" x2="3" y2="12" />
+              </svg>
+              <span className={styles.loginText}>Conectar Nube</span>
+            </button>
+          )}
 
           {userEmail && (
             <div className={styles.userSection}>

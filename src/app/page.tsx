@@ -427,7 +427,10 @@ export default function Home() {
           </div>
         </div>
 
-        <AuthForm onAuthSuccess={() => console.log('Autenticación exitosa')} />
+        <AuthForm 
+          onAuthSuccess={() => console.log('Autenticación exitosa')} 
+          onGuestAccess={() => setUseLocalMode(true)}
+        />
       </main>
     );
   }
@@ -438,6 +441,7 @@ export default function Home() {
         isCloudSynced={!useLocalMode} 
         userEmail={useLocalMode ? null : user?.email}
         onLogout={handleLogout}
+        onLoginClick={isSupabaseConfigured ? () => setUseLocalMode(false) : undefined}
       />
 
       {/* ALERTAS Y MENSAJES DE ESTADO */}

@@ -4,9 +4,10 @@ import styles from './AuthForm.module.css';
 
 interface AuthFormProps {
   onAuthSuccess: () => void;
+  onGuestAccess: () => void;
 }
 
-export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
+export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -162,6 +163,16 @@ export default function AuthForm({ onAuthSuccess }: AuthFormProps) {
             ) : (
               'Registrarse'
             )}
+          </button>
+
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ width: '100%', marginTop: '12px' }}
+            onClick={onGuestAccess}
+            disabled={loading}
+          >
+            Entrar como Invitado (Datos Locales)
           </button>
         </form>
 
