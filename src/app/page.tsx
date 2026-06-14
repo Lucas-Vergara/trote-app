@@ -501,6 +501,7 @@ export default function Home() {
               weeklyGoal={weeklyGoal}
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
+              showOnly="stats"
             />
           </div>
 
@@ -509,6 +510,16 @@ export default function Home() {
               runs={runs}
               onSelectDate={handleSelectDate}
               onQuickLog={handleQuickLog}
+            />
+          </div>
+
+          <div className={styles.dashboardSection}>
+            <MetricsDashboard
+              runs={runs}
+              weeklyGoal={weeklyGoal}
+              monthlyGoal={monthlyGoal}
+              onEditGoals={handleEditGoals}
+              showOnly="goals"
             />
           </div>
         </>

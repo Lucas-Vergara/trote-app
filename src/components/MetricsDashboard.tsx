@@ -25,9 +25,10 @@ interface MetricsDashboardProps {
   weeklyGoal: Goal | null;
   monthlyGoal: Goal | null;
   onEditGoals: (type: 'weekly' | 'monthly') => void;
+  showOnly?: 'goals' | 'stats' | 'all';
 }
 
-export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEditGoals }: MetricsDashboardProps) {
+export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEditGoals, showOnly = 'all' }: MetricsDashboardProps) {
   const [activeTab, setActiveTab] = useState<'trote' | 'rucking' | 'combinado'>('trote');
 
   // Filter runs based on the active tab for the historical stats
@@ -151,7 +152,8 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
   return (
     <div className={styles.dashboardContainer}>
       {/* SECCIÓN METAS */}
-      <div className={styles.goalsGrid}>
+      {(showOnly === 'all' || showOnly === 'goals') && (
+        <div className={styles.goalsGrid}>
         
         {/* Meta Semanal */}
         <div className={`${styles.goalCard} glass-panel fade-in`}>
@@ -240,10 +242,12 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
 
       {/* SECCIÓN ESTADÍSTICAS GENERALES */}
-      <div className={`${styles.statsCard} glass-panel fade-in`} style={{ animationDelay: '0.2s' }}>
+      {(showOnly === 'all' || showOnly === 'stats') && (
+        <div className={`${styles.statsCard} glass-panel fade-in`} style={{ animationDelay: '0.2s' }}>
         <div className={styles.statsHeader}>
           <h3 className={styles.cardTitle}>Estadísticas Históricas</h3>
           <div className={styles.filterTabs}>
@@ -301,6 +305,7 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
