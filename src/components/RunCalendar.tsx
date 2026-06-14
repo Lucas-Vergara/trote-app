@@ -7,6 +7,7 @@ interface Run {
   distance: number;
   duration: number;
   notes?: string;
+  type?: string;
 }
 
 interface RunCalendarProps {
@@ -133,10 +134,12 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
           const dayRun = cell.dayNumber ? runs.find(run => run.date === cell.dateStr) : null;
           const today = isToday(cell.dayNumber);
 
+          const isRucking = dayRun?.type === 'rucking';
+
           return (
             <div
               key={index}
-              className={`${styles.dayCell} ${!cell.dayNumber ? styles.emptyCell : ''} ${today ? styles.todayCell : ''} ${dayRun ? styles.runActiveCell : ''}`}
+              className={`${styles.dayCell} ${!cell.dayNumber ? styles.emptyCell : ''} ${today ? styles.todayCell : ''} ${dayRun ? (isRucking ? styles.ruckingActiveCell : styles.runActiveCell) : ''}`}
               onClick={() => handleCellClick(cell)}
             >
               {cell.dayNumber && (
@@ -144,8 +147,8 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
                   <span className={styles.dayNumber}>{cell.dayNumber}</span>
                   {dayRun && (
                     <div className={styles.runIndicator}>
-                      <span className={styles.runEmoji}>🏃</span>
-                      <span className={styles.runKm}>{dayRun.distance} km</span>
+                      <span className={styles.runEmoji}>{isRucking ? '🎒' : '🏃'}</span>
+                      <span className={isRucking ? styles.ruckingKm : styles.runKm}>{dayRun.distance} km</span>
                     </div>
                   )}
                 </>

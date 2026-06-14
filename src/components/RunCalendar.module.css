@@ -127,6 +127,15 @@
   color: var(--fg-light);
 }
 
+.ruckingActiveCell {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(219, 39, 119, 0.08) 100%);
+  border-color: rgba(124, 58, 237, 0.25);
+}
+
+.ruckingActiveCell .dayNumber {
+  color: var(--fg-light);
+}
+
 .runIndicator {
   display: flex;
   flex-direction: column;
@@ -144,6 +153,13 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--primary-neon);
+  white-space: nowrap;
+}
+
+.ruckingKm {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--secondary-neon);
   white-space: nowrap;
 }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import styles from './MetricsDashboard.module.css';
 
 interface Run {
@@ -7,6 +7,7 @@ interface Run {
   distance: number;
   duration: number;
   notes?: string;
+  type?: string;
 }
 
 interface Goal {
@@ -26,7 +27,21 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEditGoals }: MetricsDashboardProps) {
-  
+  const [activeTab, setActiveTab] = useState<'trote' | 'rucking' | 'combinado'>('trote');
+
+  // Filter runs based on the active tab for the historical stats
+  const filteredRunsForStats = useMemo(() => {
+    return runs.filter(run => {
+      if (activeTab === 'trote') {
+        return run.type !== 'rucking';
+      }
+      if (activeTab === 'rucking') {
+        return run.type === 'rucking';
+      }
+      return true; // 'combinado'
+    });
+  }, [runs, activeTab]);
+
   // Helper to get start and end of current week (Monday-Sunday) in local time
   const getCurrentWeekRange = () => {
     const now = new Date();
@@ -73,10 +88,10 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
   const monthlyDistance = monthlyRuns.reduce((sum, run) => sum + Number(run.distance), 0);
   const monthlyCount = monthlyRuns.length;
 
-  // Total stats (All-time or overall)
-  const totalDistance = runs.reduce((sum, run) => sum + Number(run.distance), 0);
-  const totalRuns = runs.length;
-  const totalDuration = runs.reduce((sum, run) => sum + run.duration, 0);
+  // Total stats (All-time or overall filtered)
+  const totalDistance = filteredRunsForStats.reduce((sum, run) => sum + Number(run.distance), 0);
+  const totalRuns = filteredRunsForStats.length;
+  const totalDuration = filteredRunsForStats.reduce((sum, run) => sum + run.duration, 0);
   
   // Average Pace: duration in mins / distance in km -> min/km
   const avgPaceRaw = totalDistance > 0 ? totalDuration / totalDistance : 0;
@@ -223,7 +238,29 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
 
       {/* SECCIÓN ESTADÍSTICAS GENERALES */}
       <div className={`${styles.statsCard} glass-panel fade-in`} style={{ animationDelay: '0.2s' }}>
-        <h3 className={styles.cardTitle}>Estadísticas Históricas</h3>
+        <div className={styles.statsHeader}>
+          <h3 className={styles.cardTitle}>Estadísticas Históricas</h3>
+          <div className={styles.filterTabs}>
+            <button 
+              className={`${styles.filterTabBtn} ${activeTab === 'trote' ? `${styles.activeFilterTab} ${styles.activeTrote}` : ''}`}
+              onClick={() => setActiveTab('trote')}
+            >
+              🏃 Trote
+            </button>
+            <button 
+              className={`${styles.filterTabBtn} ${activeTab === 'rucking' ? `${styles.activeFilterTab} ${styles.activeRucking}` : ''}`}
+              onClick={() => setActiveTab('rucking')}
+            >
+              🎒 Rucking
+            </button>
+            <button 
+              className={`${styles.filterTabBtn} ${activeTab === 'combinado' ? `${styles.activeFilterTab} ${styles.activeCombinado}` : ''}`}
+              onClick={() => setActiveTab('combinado')}
+            >
+              🔄 Combinado
+            </button>
+          </div>
+        </div>
         <div className={styles.statsGrid}>
           <div className={styles.statBox}>
             <span className={styles.boxLabel}>Km Totales</span>

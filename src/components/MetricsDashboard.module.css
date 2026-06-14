@@ -162,6 +162,62 @@
   padding: 24px;
 }
 
+.statsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.filterTabs {
+  display: flex;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--glass-border);
+}
+
+.filterTabBtn {
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: var(--transition-smooth);
+}
+
+.filterTabBtn:hover:not(.activeFilterTab) {
+  color: var(--fg-light);
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.activeFilterTab {
+  background: #ffffff;
+}
+
+.activeTrote {
+  color: var(--primary-neon) !important;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
+}
+
+.activeRucking {
+  color: var(--secondary-neon) !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.08);
+}
+
+.activeCombinado {
+  color: var(--accent-neon) !important;
+  box-shadow: 0 2px 6px rgba(219, 39, 119, 0.08);
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
