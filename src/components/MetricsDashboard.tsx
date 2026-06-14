@@ -90,7 +90,7 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
   const monthlyCount = monthlyRuns.length;
 
   // Total stats (All-time or overall filtered)
-  const totalDistance = filteredRunsForStats.reduce((sum, run) => sum + Number(run.distance), 0);
+  const totalDistance = filteredRunsForStats.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const totalRuns = filteredRunsForStats.length;
   const totalDuration = filteredRunsForStats.reduce((sum, run) => sum + run.duration, 0);
   
@@ -98,6 +98,11 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
   const avgPaceRaw = totalDistance > 0 ? totalDuration / totalDistance : 0;
   const avgPaceMinutes = Math.floor(avgPaceRaw);
   const avgPaceSeconds = Math.round((avgPaceRaw - avgPaceMinutes) * 60);
+
+  // Average Weight of backpack for rucking runs
+  const ruckingRunsWithWeight = filteredRunsForStats.filter(r => r.rucking_weight !== null && r.rucking_weight !== undefined);
+  const totalRuckingWeight = ruckingRunsWithWeight.reduce((sum, r) => sum + Number(r.rucking_weight), 0);
+  const avgRuckingWeight = ruckingRunsWithWeight.length > 0 ? totalRuckingWeight / ruckingRunsWithWeight.length : 0;
 
   // SVG Progress Ring generator
   const ProgressRing = ({ percentage, colorClass }: { percentage: number; colorClass: string }) => {
@@ -272,14 +277,20 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
             <span className={styles.boxValue}>{totalRuns}</span>
           </div>
           <div className={styles.statBox}>
-            <span className={styles.boxLabel}>Ritmo Promedio</span>
+            <span className={styles.boxLabel}>
+              {activeTab === 'rucking' ? 'Peso Promedio' : 'Ritmo Promedio'}
+            </span>
             <span className={styles.boxValue}>
-              {totalDistance > 0 ? (
+              {activeTab === 'rucking' ? (
+                `${avgRuckingWeight.toFixed(1)}`
+              ) : totalDistance > 0 ? (
                 `${avgPaceMinutes}:${avgPaceSeconds.toString().padStart(2, '0')}`
               ) : (
                 '0:00'
               )}
-              <span className={styles.boxUnit}> min/km</span>
+              <span className={styles.boxUnit}>
+                {activeTab === 'rucking' ? ' kg' : ' min/km'}
+              </span>
             </span>
           </div>
           <div className={styles.statBox}>

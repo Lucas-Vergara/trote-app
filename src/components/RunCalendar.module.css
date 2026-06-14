@@ -185,12 +185,22 @@
     font-size: 12px;
   }
   
+  .runIndicator {
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+    margin-top: auto;
+    width: 100%;
+  }
+
   .runEmoji {
-    font-size: 12px;
+    font-size: 13px;
   }
   
-  .runKm {
+  .runKm, .ruckingKm {
     font-size: 9px;
+    display: inline-block !important;
   }
 }
 
@@ -201,13 +211,20 @@
   
   .dayCell {
     min-height: 48px;
-  }
-  
-  .runKm {
-    display: none; /* Hide KM text on very small screens to fit layout */
+    padding: 4px 4px 6px 4px;
   }
   
   .runIndicator {
-    margin-top: 2px;
+    margin-top: auto;
+    gap: 2px;
+  }
+
+  .runEmoji {
+    font-size: 11px;
+  }
+
+  .runKm, .ruckingKm {
+    font-size: 8px;
+    display: inline-block !important;
   }
 }

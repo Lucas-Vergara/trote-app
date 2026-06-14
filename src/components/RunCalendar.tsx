@@ -152,7 +152,7 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
                       <span className={isRucking ? styles.ruckingKm : styles.runKm}>
                         {isRucking 
                           ? (dayRun.rucking_weight !== null && dayRun.rucking_weight !== undefined ? `${dayRun.rucking_weight} kg` : 'Ruck')
-                          : `${dayRun.distance || 0} km`}
+                          : `${dayRun.distance !== null && dayRun.distance !== undefined ? parseFloat(Number(dayRun.distance).toFixed(1)) : 0} km`}
                       </span>
                     </div>
                   )}
