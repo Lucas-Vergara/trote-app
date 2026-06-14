@@ -4,10 +4,11 @@ import styles from './MetricsDashboard.module.css';
 interface Run {
   id?: string;
   date: string;
-  distance: number;
+  distance: number | null;
   duration: number;
   notes?: string;
   type?: string;
+  rucking_weight?: number | null;
 }
 
 interface Goal {

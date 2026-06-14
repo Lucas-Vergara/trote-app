@@ -14,13 +14,14 @@ import styles from './page.module.css';
 interface Run {
   id?: string;
   date: string;
-  distance: number;
+  distance: number | null;
   duration: number;
   notes?: string;
   type?: string;
   plan_week?: number | null;
   plan_day?: number | null;
   avg_bpm?: number | null;
+  rucking_weight?: number | null;
 }
 
 interface Goal {
@@ -211,13 +212,14 @@ export default function Home() {
   const handleRunSubmit = async (runData: {
     id?: string;
     date: string;
-    distance: number;
+    distance: number | null;
     duration: number;
     notes: string;
     type: string;
     plan_week?: number | null;
     plan_day?: number | null;
     avg_bpm?: number | null;
+    rucking_weight?: number | null;
   }) => {
     if (useLocalMode) {
       let updatedRuns;
@@ -248,7 +250,8 @@ export default function Home() {
               type: runData.type,
               plan_week: runData.plan_week,
               plan_day: runData.plan_day,
-              avg_bpm: runData.avg_bpm
+              avg_bpm: runData.avg_bpm,
+              rucking_weight: runData.rucking_weight
             })
             .eq('id', runData.id);
           if (error) throw error;
@@ -264,7 +267,8 @@ export default function Home() {
               type: runData.type,
               plan_week: runData.plan_week,
               plan_day: runData.plan_day,
-              avg_bpm: runData.avg_bpm
+              avg_bpm: runData.avg_bpm,
+              rucking_weight: runData.rucking_weight
             }]);
           if (error) throw error;
         }

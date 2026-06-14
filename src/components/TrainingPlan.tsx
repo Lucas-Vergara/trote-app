@@ -5,13 +5,14 @@ import styles from './TrainingPlan.module.css';
 interface Run {
   id?: string;
   date: string;
-  distance: number;
+  distance: number | null;
   duration: number;
   notes?: string;
   type?: string;
   plan_week?: number | null;
   plan_day?: number | null;
   avg_bpm?: number | null;
+  rucking_weight?: number | null;
 }
 
 interface TrainingPlanProps {
@@ -157,7 +158,12 @@ export default function TrainingPlan({ runs, onSelectPlanWorkout }: TrainingPlan
                 {completedRun ? (
                   <div className={styles.completionStats}>
                     <div className={styles.statLine}>
-                      <span><strong>Registrado:</strong> {completedRun.distance} km en {completedRun.duration} min</span>
+                      <span>
+                        <strong>Registrado:</strong>{' '}
+                        {completedRun.distance !== null && completedRun.distance !== undefined ? `${completedRun.distance} km ` : ''}
+                        {completedRun.rucking_weight !== null && completedRun.rucking_weight !== undefined ? `(Carga: ${completedRun.rucking_weight} kg) ` : ''}
+                        en {completedRun.duration} min
+                      </span>
                       {completedRun.avg_bpm && (
                         <span className={`${styles.bpmStat} ${completedRun.avg_bpm > 145 ? styles.bpmHigh : ''}`}>
                           💓 {completedRun.avg_bpm} BPM

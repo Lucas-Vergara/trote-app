@@ -22,7 +22,9 @@
   border-radius: 24px;
   padding: 24px;
   box-shadow: 0 20px 40px rgba(15, 23, 42, 0.1);
-  overflow: hidden;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modalHeader {

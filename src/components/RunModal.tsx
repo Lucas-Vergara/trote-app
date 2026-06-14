@@ -4,13 +4,14 @@ import styles from './RunModal.module.css';
 interface Run {
   id?: string;
   date: string;
-  distance: number;
+  distance: number | null;
   duration: number;
   notes?: string;
   type?: string;
   plan_week?: number | null;
   plan_day?: number | null;
   avg_bpm?: number | null;
+  rucking_weight?: number | null;
 }
 
 interface RunModalProps {
@@ -19,13 +20,14 @@ interface RunModalProps {
   onSubmit: (runData: {
     id?: string;
     date: string;
-    distance: number;
+    distance: number | null;
     duration: number;
     notes: string;
     type: string;
     plan_week?: number | null;
     plan_day?: number | null;
     avg_bpm?: number | null;
+    rucking_weight?: number | null;
   }) => void;
   onDelete?: (id: string) => void;
   selectedDate: string;
@@ -54,17 +56,19 @@ export default function RunModal({
   const [avgBpm, setAvgBpm] = useState('');
   const [planWeek, setPlanWeek] = useState<number | null>(null);
   const [planDay, setPlanDay] = useState<number | null>(null);
+  const [ruckingWeight, setRuckingWeight] = useState('');
 
   useEffect(() => {
     if (existingRun) {
       setDate(existingRun.date);
-      setDistance(existingRun.distance.toString());
+      setDistance(existingRun.distance !== null && existingRun.distance !== undefined ? existingRun.distance.toString() : '');
       setDuration(existingRun.duration.toString());
       setNotes(existingRun.notes || '');
       setType(existingRun.type || 'run');
       setAvgBpm(existingRun.avg_bpm?.toString() || '');
       setPlanWeek(existingRun.plan_week ?? null);
       setPlanDay(existingRun.plan_day ?? null);
+      setRuckingWeight(existingRun.rucking_weight !== null && existingRun.rucking_weight !== undefined ? existingRun.rucking_weight.toString() : '');
     } else {
       setDate(selectedDate);
       setDistance('');
@@ -74,6 +78,7 @@ export default function RunModal({
       setAvgBpm('');
       setPlanWeek(defaultPlanWeek);
       setPlanDay(defaultPlanDay);
+      setRuckingWeight('');
     }
   }, [existingRun, selectedDate, isOpen, defaultType, defaultPlanWeek, defaultPlanDay]);
 
@@ -81,16 +86,23 @@ export default function RunModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!date || !distance || !duration) {
+    const isRuckingType = type === 'rucking';
+    if (!date || (!isRuckingType && !distance) || !duration) {
       alert('Por favor completa los campos requeridos.');
       return;
     }
 
-    const distNum = parseFloat(distance);
+    const distNum = distance ? parseFloat(distance) : null;
     const durNum = parseInt(duration, 10);
     const bpmNum = avgBpm ? parseInt(avgBpm, 10) : null;
+    const weightNum = isRuckingType && ruckingWeight ? parseFloat(ruckingWeight) : null;
 
-    if (isNaN(distNum) || distNum <= 0) {
+    if (!isRuckingType && (distNum === null || isNaN(distNum) || distNum <= 0)) {
+      alert('La distancia debe ser un número positivo.');
+      return;
+    }
+
+    if (isRuckingType && distance && (distNum === null || isNaN(distNum) || distNum <= 0)) {
       alert('La distancia debe ser un número positivo.');
       return;
     }
@@ -114,7 +126,8 @@ export default function RunModal({
       type,
       plan_week: planWeek,
       plan_day: planDay,
-      avg_bpm: bpmNum
+      avg_bpm: bpmNum,
+      rucking_weight: weightNum
     });
     onClose();
   };
@@ -179,7 +192,9 @@ export default function RunModal({
 
           <div className={styles.formRow}>
             <div className="form-group" style={{ flex: 1 }}>
-              <label htmlFor="run-distance">Distancia (km)</label>
+              <label htmlFor="run-distance">
+                Distancia (km) {type === 'rucking' ? '(Opcional)' : ''}
+              </label>
               <input
                 id="run-distance"
                 type="number"
@@ -189,7 +204,7 @@ export default function RunModal({
                 className="form-control"
                 value={distance}
                 onChange={e => setDistance(e.target.value)}
-                required
+                required={type !== 'rucking'}
               />
             </div>
 
@@ -207,6 +222,22 @@ export default function RunModal({
               />
             </div>
           </div>
+
+          {type === 'rucking' && (
+            <div className="form-group">
+              <label htmlFor="run-weight">Carga de la Mochila (kg)</label>
+              <input
+                id="run-weight"
+                type="number"
+                step="0.1"
+                min="0"
+                placeholder="ej. 10.0"
+                className="form-control"
+                value={ruckingWeight}
+                onChange={e => setRuckingWeight(e.target.value)}
+              />
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="run-bpm">Frecuencia Cardíaca Promedio (BPM)</label>

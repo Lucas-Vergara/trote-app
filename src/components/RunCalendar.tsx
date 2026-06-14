@@ -4,10 +4,11 @@ import styles from './RunCalendar.module.css';
 interface Run {
   id?: string;
   date: string;
-  distance: number;
+  distance: number | null;
   duration: number;
   notes?: string;
   type?: string;
+  rucking_weight?: number | null;
 }
 
 interface RunCalendarProps {
@@ -148,7 +149,11 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
                   {dayRun && (
                     <div className={styles.runIndicator}>
                       <span className={styles.runEmoji}>{isRucking ? '🎒' : '🏃'}</span>
-                      <span className={isRucking ? styles.ruckingKm : styles.runKm}>{dayRun.distance} km</span>
+                      <span className={isRucking ? styles.ruckingKm : styles.runKm}>
+                        {isRucking 
+                          ? (dayRun.rucking_weight !== null && dayRun.rucking_weight !== undefined ? `${dayRun.rucking_weight} kg` : 'Ruck')
+                          : `${dayRun.distance || 0} km`}
+                      </span>
                     </div>
                   )}
                 </>
