@@ -119,3 +119,33 @@
   line-height: 1.4;
   margin-bottom: 20px;
 }
+
+.gpxImportContainer {
+  margin-bottom: 20px;
+  background: rgba(2, 132, 199, 0.04);
+  border: 1.5px dashed rgba(2, 132, 199, 0.25);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  transition: var(--transition-smooth);
+}
+
+.gpxImportContainer:hover {
+  background: rgba(2, 132, 199, 0.08);
+  border-color: var(--primary-neon);
+}
+
+.gpxLabel {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--primary-neon);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gpxFileInput {
+  display: none;
+}

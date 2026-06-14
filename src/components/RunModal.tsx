@@ -82,6 +82,164 @@ export default function RunModal({
     }
   }, [existingRun, selectedDate, isOpen, defaultType, defaultPlanWeek, defaultPlanDay]);
 
+  const handleGpxImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, 'text/xml');
+
+        // Check for parsing errors
+        const parserError = xmlDoc.getElementsByTagName('parsererror');
+        if (parserError.length > 0) {
+          alert('Error al leer el archivo GPX. Asegúrate de que sea un archivo XML válido.');
+          return;
+        }
+
+        // 1. Get trackpoints
+        const trkpts = xmlDoc.getElementsByTagName('trkpt');
+        if (trkpts.length === 0) {
+          alert('El archivo GPX no contiene puntos de recorrido (trackpoints).');
+          return;
+        }
+
+        // 2. Extract Date (use first point's timestamp or metadata)
+        let firstTimeStr = '';
+        const timeNodes = xmlDoc.getElementsByTagName('time');
+        
+        // Find the first valid time in trkpts (in case metadata time is different)
+        for (let i = 0; i < trkpts.length; i++) {
+          const timeNode = trkpts[i].getElementsByTagName('time')[0];
+          if (timeNode?.textContent) {
+            firstTimeStr = timeNode.textContent;
+            break;
+          }
+        }
+        
+        // Fallback to metadata time
+        if (!firstTimeStr && timeNodes.length > 0) {
+          firstTimeStr = timeNodes[0].textContent || '';
+        }
+
+        if (firstTimeStr) {
+          const localDate = new Date(firstTimeStr);
+          // Format as YYYY-MM-DD in local time
+          const year = localDate.getFullYear();
+          const month = (localDate.getMonth() + 1).toString().padStart(2, '0');
+          const day = localDate.getDate().toString().padStart(2, '0');
+          setDate(`${year}-${month}-${day}`);
+        }
+
+        // 3. Calculate Distance using Haversine
+        let totalDist = 0;
+        const hrValues: number[] = [];
+
+        for (let i = 0; i < trkpts.length; i++) {
+          const pt = trkpts[i];
+          const lat = parseFloat(pt.getAttribute('lat') || '0');
+          const lon = parseFloat(pt.getAttribute('lon') || '0');
+
+          if (i > 0) {
+            const prevPt = trkpts[i - 1];
+            const prevLat = parseFloat(prevPt.getAttribute('lat') || '0');
+            const prevLon = parseFloat(prevPt.getAttribute('lon') || '0');
+            
+            // Haversine formula
+            const R = 6371; // Earth radius in km
+            const dLat = (lat - prevLat) * Math.PI / 180;
+            const dLon = (lon - prevLon) * Math.PI / 180;
+            const a = 
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(prevLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * 
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const dist = R * c;
+            
+            // Skip points that represent GPS jumps (e.g. > 100m in 1 second is unrealistic)
+            if (dist < 0.2) {
+              totalDist += dist;
+            }
+          }
+
+          // Extract Heart Rate (BPM)
+          // Zepp puts it in extensions: <gpxtpx:hr> or <hr>
+          let hrNode = pt.getElementsByTagName('gpxtpx:hr')[0] || pt.getElementsByTagName('hr')[0];
+          if (!hrNode) {
+            const extensions = pt.getElementsByTagName('extensions')[0];
+            if (extensions) {
+              const hrTags = extensions.getElementsByTagName('*');
+              for (let j = 0; j < hrTags.length; j++) {
+                if (hrTags[j].nodeName.endsWith('hr')) {
+                  hrNode = hrTags[j];
+                  break;
+                }
+              }
+            }
+          }
+
+          if (hrNode?.textContent) {
+            const hrVal = parseInt(hrNode.textContent, 10);
+            if (!isNaN(hrVal) && hrVal > 0) {
+              hrValues.push(hrVal);
+            }
+          }
+        }
+
+        setDistance(parseFloat(totalDist.toFixed(2)).toString());
+
+        // 4. Calculate Duration (difference in time between last and first trackpoint)
+        let lastTimeStr = '';
+        for (let i = trkpts.length - 1; i >= 0; i--) {
+          const timeNode = trkpts[i].getElementsByTagName('time')[0];
+          if (timeNode?.textContent) {
+            lastTimeStr = timeNode.textContent;
+            break;
+          }
+        }
+
+        if (firstTimeStr && lastTimeStr) {
+          const t1 = new Date(firstTimeStr).getTime();
+          const t2 = new Date(lastTimeStr).getTime();
+          const diffMin = Math.round((t2 - t1) / 1000 / 60);
+          if (diffMin > 0) {
+            setDuration(diffMin.toString());
+          }
+        }
+
+        // 5. Calculate Average BPM
+        if (hrValues.length > 0) {
+          const sumHr = hrValues.reduce((a, b) => a + b, 0);
+          const avgHr = Math.round(sumHr / hrValues.length);
+          setAvgBpm(avgHr.toString());
+        }
+
+        // 6. Try to guess type based on track name
+        const trkNameNode = xmlDoc.getElementsByTagName('name')[0];
+        if (trkNameNode?.textContent) {
+          const nameLower = trkNameNode.textContent.toLowerCase();
+          if (nameLower.includes('rucking') || nameLower.includes('ruck')) {
+            setType('rucking');
+          } else if (nameLower.includes('interval') || nameLower.includes('series')) {
+            setType('interval');
+          } else if (nameLower.includes('fondo') || nameLower.includes('long run')) {
+            setType('fondo');
+          }
+        }
+
+        alert('¡Datos del GPX importados con éxito!');
+
+      } catch (err) {
+        console.error('Error importando GPX:', err);
+        alert('Hubo un error al procesar el archivo GPX.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -160,6 +318,19 @@ export default function RunModal({
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.gpxImportContainer}>
+            <label htmlFor="gpx-file-input" className={styles.gpxLabel}>
+              📥 Importar desde archivo GPX (Zepp / Amazfit)
+            </label>
+            <input
+              id="gpx-file-input"
+              type="file"
+              accept=".gpx"
+              className={styles.gpxFileInput}
+              onChange={handleGpxImport}
+            />
+          </div>
+
           <div className={styles.formRow}>
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="run-date">Fecha</label>
