@@ -495,6 +495,14 @@ export default function Home() {
       {/* VISTA 1: PROGRESO Y CALENDARIO */}
       {activeTab === 'progress' && (
         <>
+          <div className={styles.calendarSection}>
+            <RunCalendar
+              runs={runs}
+              onSelectDate={handleSelectDate}
+              onQuickLog={handleQuickLog}
+            />
+          </div>
+
           <div className={styles.dashboardSection}>
             <MetricsDashboard
               runs={runs}
@@ -502,14 +510,6 @@ export default function Home() {
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
               showOnly="stats"
-            />
-          </div>
-
-          <div className={styles.calendarSection}>
-            <RunCalendar
-              runs={runs}
-              onSelectDate={handleSelectDate}
-              onQuickLog={handleQuickLog}
             />
           </div>
 
