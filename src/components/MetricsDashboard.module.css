@@ -203,17 +203,17 @@
   background: #ffffff;
 }
 
-.activeTrote {
+.activeSemanal {
   color: var(--primary-neon) !important;
   box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
 }
 
-.activeRucking {
+.activeMensual {
   color: var(--secondary-neon) !important;
   box-shadow: 0 2px 6px rgba(124, 58, 237, 0.08);
 }
 
-.activeCombinado {
+.activeAnual {
   color: var(--accent-neon) !important;
   box-shadow: 0 2px 6px rgba(219, 39, 119, 0.08);
 }
@@ -232,7 +232,9 @@
   padding: 16px;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 6px;
+  min-height: 140px;
 }
 
 .boxLabel {
@@ -247,10 +249,83 @@
   color: var(--fg-light);
 }
 
+.boxValueContainer {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--fg-light);
+  display: flex;
+  align-items: baseline;
+  min-height: 30px;
+}
+
 .boxUnit {
   font-size: 13px;
   font-weight: 500;
   color: var(--fg-muted);
+}
+
+/* Breakdown rows inside cards */
+.boxBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(15, 23, 42, 0.08);
+  width: 100%;
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.breakdownLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 500;
+}
+
+.breakdownValue {
+  font-weight: 600;
+  color: var(--fg-light);
+}
+
+/* Specific styling for split value in Performance */
+.boxValueSplit {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.boxValueTroteSub {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary-neon);
+}
+
+.boxValueSeparator {
+  font-size: 16px;
+  color: var(--fg-subtle);
+  font-weight: 400;
+  margin: 0 2px;
+}
+
+.boxValueRuckingSub {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--secondary-neon);
+}
+
+.boxUnitSub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  margin-left: 1px;
 }
 
 /* Responsive adjustments */

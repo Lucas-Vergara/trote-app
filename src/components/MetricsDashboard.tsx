@@ -29,20 +29,7 @@ interface MetricsDashboardProps {
 }
 
 export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEditGoals, showOnly = 'all' }: MetricsDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'trote' | 'rucking' | 'combinado'>('trote');
-
-  // Filter runs based on the active tab for the historical stats
-  const filteredRunsForStats = useMemo(() => {
-    return runs.filter(run => {
-      if (activeTab === 'trote') {
-        return run.type !== 'rucking';
-      }
-      if (activeTab === 'rucking') {
-        return run.type === 'rucking';
-      }
-      return true; // 'combinado'
-    });
-  }, [runs, activeTab]);
+  const [activeTab, setActiveTab] = useState<'semanal' | 'mensual' | 'anual'>('semanal');
 
   // Helper to get start and end of current week (Monday-Sunday) in local time
   const getCurrentWeekRange = () => {
@@ -69,10 +56,18 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
     return { start: firstDay, end: lastDay };
   };
 
+  // Helper to get start and end of current year
+  const getCurrentYearRange = () => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), 0, 1, 0, 0, 0, 0);
+    const lastDay = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    return { start: firstDay, end: lastDay };
+  };
+
   const weekRange = getCurrentWeekRange();
   const monthRange = getCurrentMonthRange();
 
-  // Filter runs
+  // Filter runs for goals (keep week/month specific ranges)
   const weeklyRuns = runs.filter(run => {
     const runDate = new Date(run.date + 'T00:00:00'); // Prevent timezone shift
     return runDate >= weekRange.start && runDate <= weekRange.end;
@@ -83,27 +78,92 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
     return runDate >= monthRange.start && runDate <= monthRange.end;
   });
 
-  // Calculate achievements
-  const weeklyDistance = weeklyRuns.reduce((sum, run) => sum + Number(run.distance), 0);
+  // Calculate achievements for goals progress rings
+  const weeklyDistance = weeklyRuns.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const weeklyCount = weeklyRuns.length;
 
-  const monthlyDistance = monthlyRuns.reduce((sum, run) => sum + Number(run.distance), 0);
+  const monthlyDistance = monthlyRuns.reduce((sum, run) => sum + Number(run.distance || 0), 0);
   const monthlyCount = monthlyRuns.length;
 
-  // Total stats (All-time or overall filtered)
-  const totalDistance = filteredRunsForStats.reduce((sum, run) => sum + Number(run.distance || 0), 0);
-  const totalRuns = filteredRunsForStats.length;
-  const totalDuration = filteredRunsForStats.reduce((sum, run) => sum + run.duration, 0);
-  
-  // Average Pace: duration in mins / distance in km -> min/km
-  const avgPaceRaw = totalDistance > 0 ? totalDuration / totalDistance : 0;
+  // Filter runs for the active tab (period range)
+  const filteredRunsForStats = useMemo(() => {
+    const range = 
+      activeTab === 'semanal' ? getCurrentWeekRange() :
+      activeTab === 'mensual' ? getCurrentMonthRange() :
+      getCurrentYearRange();
+      
+    return runs.filter(run => {
+      const runDate = new Date(run.date + 'T00:00:00'); // Prevent timezone shift
+      return runDate >= range.start && runDate <= range.end;
+    });
+  }, [runs, activeTab]);
+
+  // Split runs inside the selected period into Trote and Rucking
+  const troteRuns = useMemo(() => filteredRunsForStats.filter(r => r.type !== 'rucking'), [filteredRunsForStats]);
+  const ruckingRuns = useMemo(() => filteredRunsForStats.filter(r => r.type === 'rucking'), [filteredRunsForStats]);
+
+  // --- Km Totales ---
+  const totalDistanceCombined = useMemo(() => filteredRunsForStats.reduce((sum, run) => sum + Number(run.distance || 0), 0), [filteredRunsForStats]);
+  const totalDistanceTrote = useMemo(() => troteRuns.reduce((sum, run) => sum + Number(run.distance || 0), 0), [troteRuns]);
+  const totalDistanceRucking = useMemo(() => ruckingRuns.reduce((sum, run) => sum + Number(run.distance || 0), 0), [ruckingRuns]);
+
+  // --- Entrenamientos ---
+  const totalRunsCombined = filteredRunsForStats.length;
+  const totalRunsTrote = troteRuns.length;
+  const totalRunsRucking = ruckingRuns.length;
+
+  // --- Rendimiento Promedio ---
+  // Trote Pace: duration / distance
+  const troteDuration = useMemo(() => troteRuns.reduce((sum, run) => sum + run.duration, 0), [troteRuns]);
+  const avgPaceRaw = totalDistanceTrote > 0 ? troteDuration / totalDistanceTrote : 0;
   const avgPaceMinutes = Math.floor(avgPaceRaw);
   const avgPaceSeconds = Math.round((avgPaceRaw - avgPaceMinutes) * 60);
+  const trotePaceStr = totalDistanceTrote > 0 ? `${avgPaceMinutes}:${avgPaceSeconds.toString().padStart(2, '0')} min/km` : '0:00 min/km';
 
-  // Average Weight of backpack for rucking runs
-  const ruckingRunsWithWeight = filteredRunsForStats.filter(r => r.rucking_weight !== null && r.rucking_weight !== undefined);
-  const totalRuckingWeight = ruckingRunsWithWeight.reduce((sum, r) => sum + Number(r.rucking_weight), 0);
+  // Rucking Average Weight
+  const ruckingRunsWithWeight = useMemo(() => ruckingRuns.filter(r => r.rucking_weight !== null && r.rucking_weight !== undefined), [ruckingRuns]);
+  const totalRuckingWeight = useMemo(() => ruckingRunsWithWeight.reduce((sum, r) => sum + Number(r.rucking_weight), 0), [ruckingRunsWithWeight]);
   const avgRuckingWeight = ruckingRunsWithWeight.length > 0 ? totalRuckingWeight / ruckingRunsWithWeight.length : 0;
+  const ruckingWeightStr = avgRuckingWeight > 0 ? `${avgRuckingWeight.toFixed(1)} kg` : '0.0 kg';
+
+  // --- Tiempo Total ---
+  const totalDurationCombined = useMemo(() => filteredRunsForStats.reduce((sum, run) => sum + run.duration, 0), [filteredRunsForStats]);
+  const totalDurationTrote = useMemo(() => troteRuns.reduce((sum, run) => sum + run.duration, 0), [troteRuns]);
+  const totalDurationRucking = useMemo(() => ruckingRuns.reduce((sum, run) => sum + run.duration, 0), [ruckingRuns]);
+
+  // Formatter helper for duration (e.g. 2h 45m or 45m)
+  const formatDuration = (mins: number) => {
+    if (mins === 0) return '0m';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
+  const renderRendimientoValue = () => {
+    if (totalDistanceTrote > 0 && avgRuckingWeight > 0) {
+      return (
+        <span className={styles.boxValueSplit}>
+          <span className={styles.boxValueTroteSub}>{avgPaceMinutes}:{avgPaceSeconds.toString().padStart(2, '0')}</span>
+          <span className={styles.boxValueSeparator}>/</span>
+          <span className={styles.boxValueRuckingSub}>{avgRuckingWeight.toFixed(1)}<span className={styles.boxUnitSub}>kg</span></span>
+        </span>
+      );
+    } else if (totalDistanceTrote > 0) {
+      return (
+        <>
+          {avgPaceMinutes}:{avgPaceSeconds.toString().padStart(2, '0')} <span className={styles.boxUnit}>min/km</span>
+        </>
+      );
+    } else if (avgRuckingWeight > 0) {
+      return (
+        <>
+          {avgRuckingWeight.toFixed(1)} <span className={styles.boxUnit}>kg</span>
+        </>
+      );
+    } else {
+      return '0:00';
+    }
+  };
 
   // SVG Progress Ring generator
   const ProgressRing = ({ percentage, colorClass }: { percentage: number; colorClass: string }) => {
@@ -245,63 +305,102 @@ export default function MetricsDashboard({ runs, weeklyGoal, monthlyGoal, onEdit
         </div>
       )}
 
-      {/* SECCIÓN ESTADÍSTICAS GENERALES */}
+      {/* SECCIÓN ESTADÍSTICAS POR PERIODO */}
       {(showOnly === 'all' || showOnly === 'stats') && (
         <div className={`${styles.statsCard} glass-panel fade-in`} style={{ animationDelay: '0.2s' }}>
         <div className={styles.statsHeader}>
-          <h3 className={styles.cardTitle}>Estadísticas Históricas</h3>
+          <h3 className={styles.cardTitle}>Resumen por Periodo</h3>
           <div className={styles.filterTabs}>
             <button 
-              className={`${styles.filterTabBtn} ${activeTab === 'trote' ? `${styles.activeFilterTab} ${styles.activeTrote}` : ''}`}
-              onClick={() => setActiveTab('trote')}
+              className={`${styles.filterTabBtn} ${activeTab === 'semanal' ? `${styles.activeFilterTab} ${styles.activeSemanal}` : ''}`}
+              onClick={() => setActiveTab('semanal')}
             >
-              🏃 Trote
+              📅 Semanal
             </button>
             <button 
-              className={`${styles.filterTabBtn} ${activeTab === 'rucking' ? `${styles.activeFilterTab} ${styles.activeRucking}` : ''}`}
-              onClick={() => setActiveTab('rucking')}
+              className={`${styles.filterTabBtn} ${activeTab === 'mensual' ? `${styles.activeFilterTab} ${styles.activeMensual}` : ''}`}
+              onClick={() => setActiveTab('mensual')}
             >
-              🎒 Rucking
+              📆 Mensual
             </button>
             <button 
-              className={`${styles.filterTabBtn} ${activeTab === 'combinado' ? `${styles.activeFilterTab} ${styles.activeCombinado}` : ''}`}
-              onClick={() => setActiveTab('combinado')}
+              className={`${styles.filterTabBtn} ${activeTab === 'anual' ? `${styles.activeFilterTab} ${styles.activeAnual}` : ''}`}
+              onClick={() => setActiveTab('anual')}
             >
-              🔄 Combinado
+              🗓️ Anual
             </button>
           </div>
         </div>
+        
         <div className={styles.statsGrid}>
+          {/* Tarjeta 1: Km Totales */}
           <div className={styles.statBox}>
             <span className={styles.boxLabel}>Km Totales</span>
-            <span className={`${styles.boxValue} text-gradient`}>{totalDistance.toFixed(1)} <span className={styles.boxUnit}>km</span></span>
+            <span className={`${styles.boxValue} text-gradient`}>
+              {totalDistanceCombined.toFixed(1)} <span className={styles.boxUnit}>km</span>
+            </span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>{totalDistanceTrote.toFixed(1)} km</span>
+              </div>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                <span className={styles.breakdownValue}>{totalDistanceRucking.toFixed(1)} km</span>
+              </div>
+            </div>
           </div>
+
+          {/* Tarjeta 2: Entrenamientos */}
           <div className={styles.statBox}>
             <span className={styles.boxLabel}>Entrenamientos</span>
-            <span className={styles.boxValue}>{totalRuns}</span>
+            <span className={styles.boxValue}>{totalRunsCombined}</span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>{totalRunsTrote} ses.</span>
+              </div>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                <span className={styles.breakdownValue}>{totalRunsRucking} ses.</span>
+              </div>
+            </div>
           </div>
+
+          {/* Tarjeta 3: Rendimiento Promedio */}
           <div className={styles.statBox}>
-            <span className={styles.boxLabel}>
-              {activeTab === 'rucking' ? 'Peso Promedio' : 'Ritmo Promedio'}
-            </span>
-            <span className={styles.boxValue}>
-              {activeTab === 'rucking' ? (
-                `${avgRuckingWeight.toFixed(1)}`
-              ) : totalDistance > 0 ? (
-                `${avgPaceMinutes}:${avgPaceSeconds.toString().padStart(2, '0')}`
-              ) : (
-                '0:00'
-              )}
-              <span className={styles.boxUnit}>
-                {activeTab === 'rucking' ? ' kg' : ' min/km'}
-              </span>
-            </span>
+            <span className={styles.boxLabel}>Rendimiento Promedio</span>
+            <div className={styles.boxValueContainer}>
+              {renderRendimientoValue()}
+            </div>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Ritmo Trote</span>
+                <span className={styles.breakdownValue}>{trotePaceStr}</span>
+              </div>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🎒 Peso Rucking</span>
+                <span className={styles.breakdownValue}>{ruckingWeightStr}</span>
+              </div>
+            </div>
           </div>
+
+          {/* Tarjeta 4: Tiempo Total */}
           <div className={styles.statBox}>
             <span className={styles.boxLabel}>Tiempo Total</span>
             <span className={styles.boxValue}>
-              {Math.floor(totalDuration / 60)}h {totalDuration % 60}m
+              {formatDuration(totalDurationCombined)}
             </span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>{formatDuration(totalDurationTrote)}</span>
+              </div>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                <span className={styles.breakdownValue}>{formatDuration(totalDurationRucking)}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
