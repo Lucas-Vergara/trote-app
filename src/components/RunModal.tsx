@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import styles from './RunModal.module.css';
+import React, { useState } from "react";
+import styles from "./RunModal.module.css";
 
 interface Run {
   id?: string;
@@ -44,43 +44,35 @@ export default function RunModal({
   onDelete,
   selectedDate,
   existingRun,
-  defaultType = 'run',
+  defaultType = "run",
   defaultPlanWeek = null,
-  defaultPlanDay = null
+  defaultPlanDay = null,
 }: RunModalProps) {
-  const [date, setDate] = useState('');
-  const [distance, setDistance] = useState('');
-  const [duration, setDuration] = useState('');
-  const [notes, setNotes] = useState('');
-  const [type, setType] = useState('run');
-  const [avgBpm, setAvgBpm] = useState('');
-  const [planWeek, setPlanWeek] = useState<number | null>(null);
-  const [planDay, setPlanDay] = useState<number | null>(null);
-  const [ruckingWeight, setRuckingWeight] = useState('');
-
-  useEffect(() => {
-    if (existingRun) {
-      setDate(existingRun.date);
-      setDistance(existingRun.distance !== null && existingRun.distance !== undefined ? existingRun.distance.toString() : '');
-      setDuration(existingRun.duration.toString());
-      setNotes(existingRun.notes || '');
-      setType(existingRun.type || 'run');
-      setAvgBpm(existingRun.avg_bpm?.toString() || '');
-      setPlanWeek(existingRun.plan_week ?? null);
-      setPlanDay(existingRun.plan_day ?? null);
-      setRuckingWeight(existingRun.rucking_weight !== null && existingRun.rucking_weight !== undefined ? existingRun.rucking_weight.toString() : '');
-    } else {
-      setDate(selectedDate);
-      setDistance('');
-      setDuration('');
-      setNotes('');
-      setType(defaultType);
-      setAvgBpm('');
-      setPlanWeek(defaultPlanWeek);
-      setPlanDay(defaultPlanDay);
-      setRuckingWeight('');
-    }
-  }, [existingRun, selectedDate, isOpen, defaultType, defaultPlanWeek, defaultPlanDay]);
+  const [date, setDate] = useState(
+    existingRun ? existingRun.date : selectedDate,
+  );
+  const [distance, setDistance] = useState(
+    existingRun &&
+      existingRun.distance !== null &&
+      existingRun.distance !== undefined
+      ? existingRun.distance.toString()
+      : "",
+  );
+  const [duration, setDuration] = useState(
+    existingRun ? existingRun.duration.toString() : "",
+  );
+  const [notes, setNotes] = useState(existingRun?.notes || "");
+  const [type, setType] = useState(existingRun?.type || defaultType);
+  const [avgBpm, setAvgBpm] = useState(existingRun?.avg_bpm?.toString() || "");
+  const planWeek = existingRun?.plan_week ?? defaultPlanWeek;
+  const planDay = existingRun?.plan_day ?? defaultPlanDay;
+  const [ruckingWeight, setRuckingWeight] = useState(
+    existingRun &&
+      existingRun.rucking_weight !== null &&
+      existingRun.rucking_weight !== undefined
+      ? existingRun.rucking_weight.toString()
+      : "",
+  );
 
   const handleGpxImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,46 +83,50 @@ export default function RunModal({
       try {
         const text = event.target?.result as string;
         const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(text, 'text/xml');
+        const xmlDoc = parser.parseFromString(text, "text/xml");
 
         // Check for parsing errors
-        const parserError = xmlDoc.getElementsByTagName('parsererror');
+        const parserError = xmlDoc.getElementsByTagName("parsererror");
         if (parserError.length > 0) {
-          alert('Error al leer el archivo GPX. Asegúrate de que sea un archivo XML válido.');
+          alert(
+            "Error al leer el archivo GPX. Asegúrate de que sea un archivo XML válido.",
+          );
           return;
         }
 
         // 1. Get trackpoints
-        const trkpts = xmlDoc.getElementsByTagName('trkpt');
+        const trkpts = xmlDoc.getElementsByTagName("trkpt");
         if (trkpts.length === 0) {
-          alert('El archivo GPX no contiene puntos de recorrido (trackpoints).');
+          alert(
+            "El archivo GPX no contiene puntos de recorrido (trackpoints).",
+          );
           return;
         }
 
         // 2. Extract Date (use first point's timestamp or metadata)
-        let firstTimeStr = '';
-        const timeNodes = xmlDoc.getElementsByTagName('time');
-        
+        let firstTimeStr = "";
+        const timeNodes = xmlDoc.getElementsByTagName("time");
+
         // Find the first valid time in trkpts (in case metadata time is different)
         for (let i = 0; i < trkpts.length; i++) {
-          const timeNode = trkpts[i].getElementsByTagName('time')[0];
+          const timeNode = trkpts[i].getElementsByTagName("time")[0];
           if (timeNode?.textContent) {
             firstTimeStr = timeNode.textContent;
             break;
           }
         }
-        
+
         // Fallback to metadata time
         if (!firstTimeStr && timeNodes.length > 0) {
-          firstTimeStr = timeNodes[0].textContent || '';
+          firstTimeStr = timeNodes[0].textContent || "";
         }
 
         if (firstTimeStr) {
           const localDate = new Date(firstTimeStr);
           // Format as YYYY-MM-DD in local time
           const year = localDate.getFullYear();
-          const month = (localDate.getMonth() + 1).toString().padStart(2, '0');
-          const day = localDate.getDate().toString().padStart(2, '0');
+          const month = (localDate.getMonth() + 1).toString().padStart(2, "0");
+          const day = localDate.getDate().toString().padStart(2, "0");
           setDate(`${year}-${month}-${day}`);
         }
 
@@ -140,25 +136,27 @@ export default function RunModal({
 
         for (let i = 0; i < trkpts.length; i++) {
           const pt = trkpts[i];
-          const lat = parseFloat(pt.getAttribute('lat') || '0');
-          const lon = parseFloat(pt.getAttribute('lon') || '0');
+          const lat = parseFloat(pt.getAttribute("lat") || "0");
+          const lon = parseFloat(pt.getAttribute("lon") || "0");
 
           if (i > 0) {
             const prevPt = trkpts[i - 1];
-            const prevLat = parseFloat(prevPt.getAttribute('lat') || '0');
-            const prevLon = parseFloat(prevPt.getAttribute('lon') || '0');
-            
+            const prevLat = parseFloat(prevPt.getAttribute("lat") || "0");
+            const prevLon = parseFloat(prevPt.getAttribute("lon") || "0");
+
             // Haversine formula
             const R = 6371; // Earth radius in km
-            const dLat = (lat - prevLat) * Math.PI / 180;
-            const dLon = (lon - prevLon) * Math.PI / 180;
-            const a = 
+            const dLat = ((lat - prevLat) * Math.PI) / 180;
+            const dLon = ((lon - prevLon) * Math.PI) / 180;
+            const a =
               Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(prevLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) * 
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+              Math.cos((prevLat * Math.PI) / 180) *
+                Math.cos((lat * Math.PI) / 180) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const dist = R * c;
-            
+
             // Skip points that represent GPS jumps (e.g. > 100m in 1 second is unrealistic)
             if (dist < 0.2) {
               totalDist += dist;
@@ -167,13 +165,15 @@ export default function RunModal({
 
           // Extract Heart Rate (BPM)
           // Zepp puts it in extensions: <gpxtpx:hr> or <hr>
-          let hrNode = pt.getElementsByTagName('gpxtpx:hr')[0] || pt.getElementsByTagName('hr')[0];
+          let hrNode =
+            pt.getElementsByTagName("gpxtpx:hr")[0] ||
+            pt.getElementsByTagName("hr")[0];
           if (!hrNode) {
-            const extensions = pt.getElementsByTagName('extensions')[0];
+            const extensions = pt.getElementsByTagName("extensions")[0];
             if (extensions) {
-              const hrTags = extensions.getElementsByTagName('*');
+              const hrTags = extensions.getElementsByTagName("*");
               for (let j = 0; j < hrTags.length; j++) {
-                if (hrTags[j].nodeName.endsWith('hr')) {
+                if (hrTags[j].nodeName.endsWith("hr")) {
                   hrNode = hrTags[j];
                   break;
                 }
@@ -192,9 +192,9 @@ export default function RunModal({
         setDistance(parseFloat(totalDist.toFixed(2)).toString());
 
         // 4. Calculate Duration (difference in time between last and first trackpoint)
-        let lastTimeStr = '';
+        let lastTimeStr = "";
         for (let i = trkpts.length - 1; i >= 0; i--) {
-          const timeNode = trkpts[i].getElementsByTagName('time')[0];
+          const timeNode = trkpts[i].getElementsByTagName("time")[0];
           if (timeNode?.textContent) {
             lastTimeStr = timeNode.textContent;
             break;
@@ -218,23 +218,28 @@ export default function RunModal({
         }
 
         // 6. Try to guess type based on track name
-        const trkNameNode = xmlDoc.getElementsByTagName('name')[0];
+        const trkNameNode = xmlDoc.getElementsByTagName("name")[0];
         if (trkNameNode?.textContent) {
           const nameLower = trkNameNode.textContent.toLowerCase();
-          if (nameLower.includes('rucking') || nameLower.includes('ruck')) {
-            setType('rucking');
-          } else if (nameLower.includes('interval') || nameLower.includes('series')) {
-            setType('interval');
-          } else if (nameLower.includes('fondo') || nameLower.includes('long run')) {
-            setType('fondo');
+          if (nameLower.includes("rucking") || nameLower.includes("ruck")) {
+            setType("rucking");
+          } else if (
+            nameLower.includes("interval") ||
+            nameLower.includes("series")
+          ) {
+            setType("interval");
+          } else if (
+            nameLower.includes("fondo") ||
+            nameLower.includes("long run")
+          ) {
+            setType("fondo");
           }
         }
 
-        alert('¡Datos del GPX importados con éxito!');
-
+        alert("¡Datos del GPX importados con éxito!");
       } catch (err) {
-        console.error('Error importando GPX:', err);
-        alert('Hubo un error al procesar el archivo GPX.');
+        console.error("Error importando GPX:", err);
+        alert("Hubo un error al procesar el archivo GPX.");
       }
     };
     reader.readAsText(file);
@@ -244,34 +249,42 @@ export default function RunModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const isRuckingType = type === 'rucking';
+    const isRuckingType = type === "rucking";
     if (!date || (!isRuckingType && !distance) || !duration) {
-      alert('Por favor completa los campos requeridos.');
+      alert("Por favor completa los campos requeridos.");
       return;
     }
 
     const distNum = distance ? parseFloat(distance) : null;
     const durNum = parseInt(duration, 10);
     const bpmNum = avgBpm ? parseInt(avgBpm, 10) : null;
-    const weightNum = isRuckingType && ruckingWeight ? parseFloat(ruckingWeight) : null;
+    const weightNum =
+      isRuckingType && ruckingWeight ? parseFloat(ruckingWeight) : null;
 
-    if (!isRuckingType && (distNum === null || isNaN(distNum) || distNum <= 0)) {
-      alert('La distancia debe ser un número positivo.');
+    if (
+      !isRuckingType &&
+      (distNum === null || isNaN(distNum) || distNum <= 0)
+    ) {
+      alert("La distancia debe ser un número positivo.");
       return;
     }
 
-    if (isRuckingType && distance && (distNum === null || isNaN(distNum) || distNum <= 0)) {
-      alert('La distancia debe ser un número positivo.');
+    if (
+      isRuckingType &&
+      distance &&
+      (distNum === null || isNaN(distNum) || distNum <= 0)
+    ) {
+      alert("La distancia debe ser un número positivo.");
       return;
     }
 
     if (isNaN(durNum) || durNum <= 0) {
-      alert('La duración debe ser mayor a 0 minutos.');
+      alert("La duración debe ser mayor a 0 minutos.");
       return;
     }
 
     if (bpmNum !== null && (isNaN(bpmNum) || bpmNum <= 0)) {
-      alert('Las pulsaciones (BPM) deben ser un número positivo.');
+      alert("Las pulsaciones (BPM) deben ser un número positivo.");
       return;
     }
 
@@ -285,14 +298,16 @@ export default function RunModal({
       plan_week: planWeek,
       plan_day: planDay,
       avg_bpm: bpmNum,
-      rucking_weight: weightNum
+      rucking_weight: weightNum,
     });
     onClose();
   };
 
   const handleDelete = () => {
     if (existingRun?.id && onDelete) {
-      if (confirm('¿Estás seguro de que quieres eliminar este entrenamiento?')) {
+      if (
+        confirm("¿Estás seguro de que quieres eliminar este entrenamiento?")
+      ) {
         onDelete(existingRun.id);
         onClose();
       }
@@ -303,14 +318,27 @@ export default function RunModal({
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={`${styles.modal} glass-panel fade-in`} onClick={e => e.stopPropagation()}>
+      <div
+        className={`${styles.modal} glass-panel fade-in`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
-            {existingRun ? 'Editar Sesión' : 'Registrar Sesión'}
+            {existingRun ? "Editar Sesión" : "Registrar Sesión"}
             {planWeek && ` (Semana ${planWeek} - Día ${planDay})`}
           </h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={styles.closeIcon}>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Cerrar"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className={styles.closeIcon}
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -320,7 +348,7 @@ export default function RunModal({
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.gpxImportContainer}>
             <label htmlFor="gpx-file-input" className={styles.gpxLabel}>
-              📥 Importar desde archivo GPX (Zepp / Amazfit)
+              📥 Importar desde archivo GPX
             </label>
             <input
               id="gpx-file-input"
@@ -339,7 +367,7 @@ export default function RunModal({
                 type="date"
                 className="form-control"
                 value={date}
-                onChange={e => setDate(e.target.value)}
+                onChange={(e) => setDate(e.target.value)}
                 required
               />
             </div>
@@ -350,7 +378,7 @@ export default function RunModal({
                 id="run-type"
                 className="form-control"
                 value={type}
-                onChange={e => setType(e.target.value)}
+                onChange={(e) => setType(e.target.value)}
                 required
               >
                 <option value="run">Trote General</option>
@@ -364,7 +392,7 @@ export default function RunModal({
           <div className={styles.formRow}>
             <div className="form-group" style={{ flex: 1 }}>
               <label htmlFor="run-distance">
-                Distancia (km) {type === 'rucking' ? '(Opcional)' : ''}
+                Distancia (km) {type === "rucking" ? "(Opcional)" : ""}
               </label>
               <input
                 id="run-distance"
@@ -374,8 +402,8 @@ export default function RunModal({
                 placeholder="ej. 5.2"
                 className="form-control"
                 value={distance}
-                onChange={e => setDistance(e.target.value)}
-                required={type !== 'rucking'}
+                onChange={(e) => setDistance(e.target.value)}
+                required={type !== "rucking"}
               />
             </div>
 
@@ -388,13 +416,13 @@ export default function RunModal({
                 placeholder="ej. 30"
                 className="form-control"
                 value={duration}
-                onChange={e => setDuration(e.target.value)}
+                onChange={(e) => setDuration(e.target.value)}
                 required
               />
             </div>
           </div>
 
-          {type === 'rucking' && (
+          {type === "rucking" && (
             <div className="form-group">
               <label htmlFor="run-weight">Carga de la Mochila (kg)</label>
               <input
@@ -405,7 +433,7 @@ export default function RunModal({
                 placeholder="ej. 10.0"
                 className="form-control"
                 value={ruckingWeight}
-                onChange={e => setRuckingWeight(e.target.value)}
+                onChange={(e) => setRuckingWeight(e.target.value)}
               />
             </div>
           )}
@@ -420,13 +448,16 @@ export default function RunModal({
               placeholder="ej. 138 (Opcional)"
               className="form-control"
               value={avgBpm}
-              onChange={e => setAvgBpm(e.target.value)}
+              onChange={(e) => setAvgBpm(e.target.value)}
             />
           </div>
 
           {showBpmWarning && (
             <div className={styles.bpmAlert}>
-              ⚠️ <strong>Límite de Pulso Superado (145 BPM):</strong> El Plan Base indica que si tus BPM superan los 145, debes caminar hasta que bajen de 130. Recuerda mantener un control estricto de tu reloj.
+              ⚠️ <strong>Límite de Pulso Superado (145 BPM):</strong> El Plan
+              Base indica que si tus BPM superan los 145, debes caminar hasta
+              que bajen de 130. Recuerda mantener un control estricto de tu
+              reloj.
             </div>
           )}
 
@@ -437,19 +468,23 @@ export default function RunModal({
               rows={3}
               placeholder="ej. Trote suave. Controlé el pulso al subir pendientes."
               className="form-control"
-              style={{ resize: 'none' }}
+              style={{ resize: "none" }}
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
             />
           </div>
 
           <div className={styles.actions}>
             {existingRun && onDelete && (
-              <button type="button" className="btn-danger" onClick={handleDelete}>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={handleDelete}
+              >
                 Eliminar
               </button>
             )}
-            
+
             <div className={styles.rightActions}>
               <button type="button" className="btn-secondary" onClick={onClose}>
                 Cancelar

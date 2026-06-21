@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import styles from './GoalsModal.module.css';
+import React, { useState } from "react";
+import styles from "./GoalsModal.module.css";
 
 interface Goal {
   id?: string;
-  type: 'weekly' | 'monthly';
+  type: "weekly" | "monthly";
   target_distance: number;
   target_runs: number;
   start_date: string;
@@ -15,13 +15,13 @@ interface GoalsModalProps {
   onClose: () => void;
   onSubmit: (goalData: {
     id?: string;
-    type: 'weekly' | 'monthly';
+    type: "weekly" | "monthly";
     target_distance: number;
     target_runs: number;
     start_date: string;
     end_date: string;
   }) => void;
-  type: 'weekly' | 'monthly';
+  type: "weekly" | "monthly";
   existingGoal: Goal | null;
 }
 
@@ -30,56 +30,53 @@ export default function GoalsModal({
   onClose,
   onSubmit,
   type,
-  existingGoal
+  existingGoal,
 }: GoalsModalProps) {
-  const [distance, setDistance] = useState('');
-  const [runs, setRuns] = useState('');
+  const [distance, setDistance] = useState(
+    existingGoal ? existingGoal.target_distance.toString() : "",
+  );
+  const [runs, setRuns] = useState(
+    existingGoal ? existingGoal.target_runs.toString() : "",
+  );
 
-  useEffect(() => {
-    if (existingGoal) {
-      setDistance(existingGoal.target_distance.toString());
-      setRuns(existingGoal.target_runs.toString());
-    } else {
-      setDistance('');
-      setRuns('');
-    }
-  }, [existingGoal, isOpen]);
+  // Remove the useEffect syncing state since we can just use keys on the parent to unmount/remount
+  // or initialize values based on props directly.
 
   if (!isOpen) return null;
 
   // Helper to format Date to YYYY-MM-DD local string
   const formatDateStr = (date: Date) => {
     const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
   // Auto-calculate start and end dates based on type
   const calculateDates = (): { start: string; end: string } => {
     const now = new Date();
-    
-    if (type === 'weekly') {
+
+    if (type === "weekly") {
       const currentDay = now.getDay();
       const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-      
+
       const monday = new Date(now);
       monday.setDate(now.getDate() + distanceToMonday);
-      
+
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      
+
       return {
         start: formatDateStr(monday),
-        end: formatDateStr(sunday)
+        end: formatDateStr(sunday),
       };
     } else {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       return {
         start: formatDateStr(firstDay),
-        end: formatDateStr(lastDay)
+        end: formatDateStr(lastDay),
       };
     }
   };
@@ -87,7 +84,7 @@ export default function GoalsModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!distance || !runs) {
-      alert('Por favor completa los campos requeridos.');
+      alert("Por favor completa los campos requeridos.");
       return;
     }
 
@@ -95,12 +92,12 @@ export default function GoalsModal({
     const runsNum = parseInt(runs, 10);
 
     if (isNaN(distNum) || distNum <= 0) {
-      alert('La distancia debe ser un número positivo.');
+      alert("La distancia debe ser un número positivo.");
       return;
     }
 
     if (isNaN(runsNum) || runsNum <= 0) {
-      alert('La cantidad de corridas debe ser mayor a 0.');
+      alert("La cantidad de corridas debe ser mayor a 0.");
       return;
     }
 
@@ -112,20 +109,34 @@ export default function GoalsModal({
       target_distance: distNum,
       target_runs: runsNum,
       start_date: start,
-      end_date: end
+      end_date: end,
     });
     onClose();
   };
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={`${styles.modal} glass-panel fade-in`} onClick={e => e.stopPropagation()}>
+      <div
+        className={`${styles.modal} glass-panel fade-in`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
-            {existingGoal ? 'Editar Meta' : 'Crear Meta'} {type === 'weekly' ? 'Semanal' : 'Mensual'}
+            {existingGoal ? "Editar Meta" : "Crear Meta"}{" "}
+            {type === "weekly" ? "Semanal" : "Mensual"}
           </h2>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Cerrar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className={styles.closeIcon}>
+          <button
+            className={styles.closeBtn}
+            onClick={onClose}
+            aria-label="Cerrar"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className={styles.closeIcon}
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -133,7 +144,9 @@ export default function GoalsModal({
         </div>
 
         <p className={styles.description}>
-          Define tus objetivos de carrera. Calcularemos automáticamente el periodo de validez para esta {type === 'weekly' ? 'semana (Lunes a Domingo)' : 'mes completo'}.
+          Define tus objetivos de carrera. Calcularemos automáticamente el
+          periodo de validez para esta{" "}
+          {type === "weekly" ? "semana (Lunes a Domingo)" : "mes completo"}.
         </p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
@@ -144,10 +157,10 @@ export default function GoalsModal({
               type="number"
               step="0.1"
               min="0.1"
-              placeholder={type === 'weekly' ? 'ej. 20' : 'ej. 80'}
+              placeholder={type === "weekly" ? "ej. 20" : "ej. 80"}
               className="form-control"
               value={distance}
-              onChange={e => setDistance(e.target.value)}
+              onChange={(e) => setDistance(e.target.value)}
               required
             />
           </div>
@@ -158,10 +171,10 @@ export default function GoalsModal({
               id="goal-runs"
               type="number"
               min="1"
-              placeholder={type === 'weekly' ? 'ej. 3' : 'ej. 12'}
+              placeholder={type === "weekly" ? "ej. 3" : "ej. 12"}
               className="form-control"
               value={runs}
-              onChange={e => setRuns(e.target.value)}
+              onChange={(e) => setRuns(e.target.value)}
               required
             />
           </div>

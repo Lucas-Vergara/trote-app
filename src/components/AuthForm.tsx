@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import styles from './AuthForm.module.css';
+import React, { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import styles from "./AuthForm.module.css";
 
 interface AuthFormProps {
   onAuthSuccess: () => void;
   onGuestAccess: () => void;
 }
 
-export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps) {
+export default function AuthForm({
+  onAuthSuccess,
+  onGuestAccess,
+}: AuthFormProps) {
   const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: 'error' | 'success' } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    type: "error" | "success";
+  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,7 +27,10 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
     const cleanEmail = email.trim();
     if (!cleanEmail || !password) {
-      setMessage({ text: 'Por favor, rellena todos los campos.', type: 'error' });
+      setMessage({
+        text: "Por favor, rellena todos los campos.",
+        type: "error",
+      });
       setLoading(false);
       return;
     }
@@ -47,29 +56,34 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
         // Supabase sometimes requires email confirmation depending on settings
         if (data.session) {
-          setMessage({ text: '¡Cuenta creada con éxito!', type: 'success' });
+          setMessage({ text: "¡Cuenta creada con éxito!", type: "success" });
           onAuthSuccess();
         } else {
           setMessage({
-            text: '¡Registro exitoso! Por favor, revisa tu correo para confirmar tu cuenta.',
-            type: 'success',
+            text: "¡Registro exitoso! Por favor, revisa tu correo para confirmar tu cuenta.",
+            type: "success",
           });
         }
       }
-    } catch (err: any) {
-      console.error('Error de autenticación:', err);
-      let errorMsg = err.message || 'Ocurrió un error inesperado.';
-      
+    } catch (err: unknown) {
+      console.error("Error de autenticación:", err);
+      let errorMsg =
+        err instanceof Error
+          ? err.message
+          : String(err) || "Ocurrió un error inesperado.";
+
       // Translate common error messages
-      if (errorMsg.includes('Invalid login credentials')) {
-        errorMsg = 'Credenciales de inicio de sesión inválidas. Revisa tu correo o contraseña.';
-      } else if (errorMsg.includes('User already registered')) {
-        errorMsg = 'Este correo electrónico ya está registrado.';
-      } else if (errorMsg.includes('Signup is disabled')) {
-        errorMsg = 'El registro de nuevas cuentas está deshabilitado en esta aplicación. Solo los usuarios invitados pueden acceder.';
+      if (errorMsg.includes("Invalid login credentials")) {
+        errorMsg =
+          "Credenciales de inicio de sesión inválidas. Revisa tu correo o contraseña.";
+      } else if (errorMsg.includes("User already registered")) {
+        errorMsg = "Este correo electrónico ya está registrado.";
+      } else if (errorMsg.includes("Signup is disabled")) {
+        errorMsg =
+          "El registro de nuevas cuentas está deshabilitado en esta aplicación. Solo los usuarios invitados pueden acceder.";
       }
-      
-      setMessage({ text: errorMsg, type: 'error' });
+
+      setMessage({ text: errorMsg, type: "error" });
     } finally {
       setLoading(false);
     }
@@ -80,7 +94,15 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
       <div className={`${styles.authCard} glass-panel fade-in`}>
         {/* LOGO */}
         <div className={styles.logoSection}>
-          <svg className={styles.logoIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            className={styles.logoIcon}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M18 8h.01" />
             <path d="M17 22v-3a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v3" />
             <path d="M2 10h20" />
@@ -90,15 +112,19 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
             <path d="M2 14h2" />
             <path d="M6 6h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
           </svg>
-          <h1 className={styles.logoText}>Trote<span className="text-gradient">App</span></h1>
-          <p className={styles.tagline}>Tu planificador privado de carrera 10K</p>
+          <h1 className={styles.logoText}>
+            Trote<span className="text-gradient">App</span>
+          </h1>
+          <p className={styles.tagline}>
+            Tu planificador privado de carrera 10K
+          </p>
         </div>
 
         {/* TABS NAVEGACIÓN */}
         <div className={styles.tabs}>
           <button
             type="button"
-            className={`${styles.tabBtn} ${isLogin ? styles.activeTab : ''}`}
+            className={`${styles.tabBtn} ${isLogin ? styles.activeTab : ""}`}
             onClick={() => {
               setIsLogin(true);
               setMessage(null);
@@ -108,7 +134,7 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
           </button>
           <button
             type="button"
-            className={`${styles.tabBtn} ${!isLogin ? styles.activeTab : ''}`}
+            className={`${styles.tabBtn} ${!isLogin ? styles.activeTab : ""}`}
             onClick={() => {
               setIsLogin(false);
               setMessage(null);
@@ -120,8 +146,10 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
         {/* MENSAJE DE ESTADO */}
         {message && (
-          <div className={`${styles.alert} ${message.type === 'error' ? styles.alertError : styles.alertSuccess}`}>
-            {message.type === 'error' ? '⚠️ ' : '✅ '}
+          <div
+            className={`${styles.alert} ${message.type === "error" ? styles.alertError : styles.alertSuccess}`}
+          >
+            {message.type === "error" ? "⚠️ " : "✅ "}
             {message.text}
           </div>
         )}
@@ -136,7 +164,7 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
               placeholder="correo@ejemplo.com"
               className="form-control"
               value={email}
-              onChange={e => setEmail(e.target.value)}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
@@ -149,30 +177,43 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
               placeholder="••••••••"
               className="form-control"
               value={password}
-              onChange={e => setPassword(e.target.value)}
+              onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
             />
           </div>
 
-          <button type="submit" className="btn-primary" style={{ width: '100%', marginTop: '10px' }} disabled={loading}>
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: "100%", marginTop: "10px" }}
+            disabled={loading}
+          >
             {loading ? (
               <div className={styles.spinner}></div>
             ) : isLogin ? (
-              'Ingresar'
+              "Ingresar"
             ) : (
-              'Registrarse'
+              "Registrarse"
             )}
           </button>
 
           <button
             type="button"
             className={styles.guestBtn}
-            style={{ width: '100%', marginTop: '12px' }}
+            style={{ width: "100%", marginTop: "12px" }}
             onClick={onGuestAccess}
             disabled={loading}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: '16px', height: '16px' }}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ width: "16px", height: "16px" }}
+            >
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
@@ -182,9 +223,17 @@ export default function AuthForm({ onAuthSuccess, onGuestAccess }: AuthFormProps
 
         <p className={styles.securityNote}>
           {isLogin ? (
-            <span>¿Quieres probar la app sin registrarte? Presiona <strong>Entrar como Invitado</strong> para probar todas las funciones usando el almacenamiento local de tu navegador.</span>
+            <span>
+              ¿Quieres probar la app sin registrarte? Presiona{" "}
+              <strong>Entrar como Invitado</strong> para probar todas las
+              funciones usando el almacenamiento local de tu navegador.
+            </span>
           ) : (
-            <span>¿Prefieres no crear una cuenta? Puedes entrar como <strong>Invitado</strong> para probar todo localmente de forma privada.</span>
+            <span>
+              ¿Prefieres no crear una cuenta? Puedes entrar como{" "}
+              <strong>Invitado</strong> para probar todo localmente de forma
+              privada.
+            </span>
           )}
         </p>
       </div>
