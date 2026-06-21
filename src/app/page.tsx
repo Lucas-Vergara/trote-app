@@ -9,6 +9,7 @@ import GoalsModal from '@/components/GoalsModal';
 import TrainingPlan from '@/components/TrainingPlan';
 import AuthForm from '@/components/AuthForm';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { TRAINING_PLAN_10K } from '@/lib/planData';
 import styles from './page.module.css';
 
 interface Run {
@@ -221,16 +222,73 @@ export default function Home() {
     avg_bpm?: number | null;
     rucking_weight?: number | null;
   }) => {
+    let matchedWeek = runData.plan_week;
+    let matchedDay = runData.plan_day;
+
+    // Auto-detect matching training plan workouts only on creation (new run) and if not already manually linked
+    if (!runData.id && !runData.plan_week && !runData.plan_day) {
+      // 1st Condition: check if all workouts are already completed
+      const isPlanFullyCompleted = () => {
+        for (const week of TRAINING_PLAN_10K) {
+          for (const workout of week.workouts) {
+            const isCompleted = runs.some(r => r.plan_week === week.weekNum && r.plan_day === workout.dayNum);
+            if (!isCompleted) return false;
+          }
+        }
+        return true;
+      };
+
+      if (!isPlanFullyCompleted()) {
+        // Chronological search (Week 1 Day 1 to Week 8 Day 3)
+        for (const week of TRAINING_PLAN_10K) {
+          let foundMatch = false;
+          for (const workout of week.workouts) {
+            // Already completed?
+            const isCompleted = runs.some(r => r.plan_week === week.weekNum && r.plan_day === workout.dayNum);
+            if (isCompleted) continue;
+
+            // Type check: rucking matches rucking, run/interval/fondo matches interval/fondo
+            const isRuckingWorkout = workout.workoutType === 'rucking';
+            const isRuckingRun = runData.type === 'rucking';
+            if (isRuckingWorkout !== isRuckingRun) continue;
+
+            const runDist = runData.distance !== null ? Number(runData.distance) : 0;
+            const runDur = Number(runData.duration || 0);
+
+            // Meets requirements (~80% target)
+            if (workout.duration > 0 && runDur < workout.duration * 0.8) continue;
+            if (workout.distance > 0 && runDist < workout.distance * 0.8) continue;
+
+            matchedWeek = week.weekNum;
+            matchedDay = workout.dayNum;
+            foundMatch = true;
+            break;
+          }
+          if (foundMatch) break;
+        }
+
+        if (matchedWeek && matchedDay) {
+          alert(`🎯 ¡Reconocimiento Automático! Esta actividad cumple con los requisitos del Plan 10K (Semana ${matchedWeek}, Día ${matchedDay}) y se ha marcado como completada.`);
+        }
+      }
+    }
+
+    const finalRunData = {
+      ...runData,
+      plan_week: matchedWeek,
+      plan_day: matchedDay
+    };
+
     if (useLocalMode) {
       let updatedRuns;
-      if (runData.id) {
+      if (finalRunData.id) {
         // Edit
-        updatedRuns = runs.map(r => r.id === runData.id ? { ...r, ...runData } : r);
+        updatedRuns = runs.map(r => r.id === finalRunData.id ? { ...r, ...finalRunData } : r);
       } else {
         // Add
         const newRun: Run = {
           id: Math.random().toString(36).substring(2, 9),
-          ...runData
+          ...finalRunData
         };
         updatedRuns = [newRun, ...runs];
       }
@@ -239,36 +297,36 @@ export default function Home() {
     } else {
       setIsLoading(true);
       try {
-        if (runData.id) {
+        if (finalRunData.id) {
           const { error } = await supabase
             .from('runs')
             .update({
-              date: runData.date,
-              distance: runData.distance,
-              duration: runData.duration,
-              notes: runData.notes,
-              type: runData.type,
-              plan_week: runData.plan_week,
-              plan_day: runData.plan_day,
-              avg_bpm: runData.avg_bpm,
-              rucking_weight: runData.rucking_weight
+              date: finalRunData.date,
+              distance: finalRunData.distance,
+              duration: finalRunData.duration,
+              notes: finalRunData.notes,
+              type: finalRunData.type,
+              plan_week: finalRunData.plan_week,
+              plan_day: finalRunData.plan_day,
+              avg_bpm: finalRunData.avg_bpm,
+              rucking_weight: finalRunData.rucking_weight
             })
-            .eq('id', runData.id);
+            .eq('id', finalRunData.id);
           if (error) throw error;
         } else {
           // user_id is automatically assigned by auth.uid() DEFAULT in database schema
           const { error } = await supabase
             .from('runs')
             .insert([{
-              date: runData.date,
-              distance: runData.distance,
-              duration: runData.duration,
-              notes: runData.notes,
-              type: runData.type,
-              plan_week: runData.plan_week,
-              plan_day: runData.plan_day,
-              avg_bpm: runData.avg_bpm,
-              rucking_weight: runData.rucking_weight
+              date: finalRunData.date,
+              distance: finalRunData.distance,
+              duration: finalRunData.duration,
+              notes: finalRunData.notes,
+              type: finalRunData.type,
+              plan_week: finalRunData.plan_week,
+              plan_day: finalRunData.plan_day,
+              avg_bpm: finalRunData.avg_bpm,
+              rucking_weight: finalRunData.rucking_weight
             }]);
           if (error) throw error;
         }
