@@ -144,9 +144,10 @@
 }
 
 .dayEmoji {
-  font-size: 16px;
+  font-size: 20px;
   animation: bounce 2s infinite;
-  margin-top: -2px;
+  align-self: center;
+  margin: auto 0;
 }
 
 .runInfo {
@@ -196,7 +197,7 @@
   }
   
   .dayEmoji {
-    font-size: 12px;
+    font-size: 15px;
   }
   
   .runKm, .ruckingKm {
@@ -220,7 +221,7 @@
   }
   
   .dayEmoji {
-    font-size: 11px;
+    font-size: 13px;
   }
   
   .runKm, .ruckingKm {
