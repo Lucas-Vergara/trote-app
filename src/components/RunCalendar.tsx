@@ -145,10 +145,12 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
             >
               {cell.dayNumber && (
                 <>
-                  <span className={styles.dayNumber}>{cell.dayNumber}</span>
+                  <div className={styles.cellHeader}>
+                    <span className={styles.dayNumber}>{cell.dayNumber}</span>
+                    {dayRun && <span className={styles.dayEmoji}>{isRucking ? '🎒' : '🏃'}</span>}
+                  </div>
                   {dayRun && (
-                    <div className={styles.runIndicator}>
-                      <span className={styles.runEmoji}>{isRucking ? '🎒' : '🏃'}</span>
+                    <div className={styles.runInfo}>
                       <span className={isRucking ? styles.ruckingKm : styles.runKm}>
                         {isRucking 
                           ? (dayRun.rucking_weight !== null && dayRun.rucking_weight !== undefined ? `${dayRun.rucking_weight} kg` : 'Ruck')

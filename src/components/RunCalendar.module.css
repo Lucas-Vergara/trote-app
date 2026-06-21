@@ -136,29 +136,39 @@
   color: var(--fg-light);
 }
 
-.runIndicator {
+.cellHeader {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 2px;
-  margin-top: 4px;
+  width: 100%;
 }
 
-.runEmoji {
+.dayEmoji {
   font-size: 16px;
   animation: bounce 2s infinite;
+  margin-top: -2px;
+}
+
+.runInfo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin-top: auto;
+  text-align: center;
+  padding-bottom: 2px;
 }
 
 .runKm {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--primary-neon);
   white-space: nowrap;
 }
 
 .ruckingKm {
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--secondary-neon);
   white-space: nowrap;
 }
@@ -177,30 +187,21 @@
   .dayCell {
     aspect-ratio: 1;
     min-height: 55px;
-    padding: 6px 6px 10px 6px;
+    padding: 6px 6px 8px 6px;
     border-radius: 8px;
   }
   
   .dayNumber {
+    font-size: 11px;
+  }
+  
+  .dayEmoji {
     font-size: 12px;
   }
   
-  .runIndicator {
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    gap: 3px;
-    margin-top: auto;
-    width: 100%;
-  }
-
-  .runEmoji {
-    font-size: 13px;
-  }
-  
   .runKm, .ruckingKm {
-    font-size: 9px;
-    display: inline-block !important;
+    font-size: 10px;
+    font-weight: 800;
   }
 }
 
@@ -214,17 +215,15 @@
     padding: 4px 4px 6px 4px;
   }
   
-  .runIndicator {
-    margin-top: auto;
-    gap: 2px;
+  .dayNumber {
+    font-size: 10px;
   }
-
-  .runEmoji {
+  
+  .dayEmoji {
     font-size: 11px;
   }
-
+  
   .runKm, .ruckingKm {
-    font-size: 8px;
-    display: inline-block !important;
+    font-size: 9px;
   }
 }
