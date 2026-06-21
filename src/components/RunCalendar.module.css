@@ -148,6 +148,8 @@
   animation: bounce 2s infinite;
   align-self: center;
   margin: auto 0;
+  position: relative;
+  top: -3px;
 }
 
 .runInfo {
@@ -198,6 +200,8 @@
   
   .dayEmoji {
     font-size: 15px;
+    position: relative;
+    top: -2px;
   }
   
   .runKm, .ruckingKm {
@@ -222,6 +226,8 @@
   
   .dayEmoji {
     font-size: 13px;
+    position: relative;
+    top: -1px;
   }
   
   .runKm, .ruckingKm {
