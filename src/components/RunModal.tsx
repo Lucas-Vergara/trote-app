@@ -35,6 +35,7 @@ interface RunModalProps {
   defaultType?: string;
   defaultPlanWeek?: number | null;
   defaultPlanDay?: number | null;
+  showRucking?: boolean;
 }
 
 export default function RunModal({
@@ -47,6 +48,7 @@ export default function RunModal({
   defaultType = "run",
   defaultPlanWeek = null,
   defaultPlanDay = null,
+  showRucking = false,
 }: RunModalProps) {
   const [date, setDate] = useState(
     existingRun ? existingRun.date : selectedDate,
@@ -221,7 +223,10 @@ export default function RunModal({
         const trkNameNode = xmlDoc.getElementsByTagName("name")[0];
         if (trkNameNode?.textContent) {
           const nameLower = trkNameNode.textContent.toLowerCase();
-          if (nameLower.includes("rucking") || nameLower.includes("ruck")) {
+          if (
+            showRucking &&
+            (nameLower.includes("rucking") || nameLower.includes("ruck"))
+          ) {
             setType("rucking");
           } else if (
             nameLower.includes("interval") ||
@@ -314,7 +319,11 @@ export default function RunModal({
     }
   };
 
-  const showBpmWarning = avgBpm && parseInt(avgBpm, 10) > 145;
+  // Plan 10K desactivado
+  // const showBpmWarning = avgBpm && parseInt(avgBpm, 10) > 145;
+
+  // Rucking oculto por preferencias (salvo al editar una sesión que ya es rucking)
+  const canSelectRucking = showRucking || existingRun?.type === "rucking";
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -325,7 +334,9 @@ export default function RunModal({
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
             {existingRun ? "Editar Sesión" : "Registrar Sesión"}
+            {/* Plan 10K desactivado
             {planWeek && ` (Semana ${planWeek} - Día ${planDay})`}
+            */}
           </h2>
           <button
             className={styles.closeBtn}
@@ -383,7 +394,9 @@ export default function RunModal({
               >
                 <option value="run">Trote General</option>
                 <option value="interval">Trote (Intervalos)</option>
-                <option value="rucking">Rucking (Carga)</option>
+                {canSelectRucking && (
+                  <option value="rucking">Rucking (Carga)</option>
+                )}
                 <option value="fondo">Trote (Fondo)</option>
               </select>
             </div>
@@ -452,6 +465,7 @@ export default function RunModal({
             />
           </div>
 
+          {/* Plan 10K desactivado
           {showBpmWarning && (
             <div className={styles.bpmAlert}>
               ⚠️ <strong>Límite de Pulso Superado (145 BPM):</strong> El Plan
@@ -460,6 +474,7 @@ export default function RunModal({
               reloj.
             </div>
           )}
+          */}
 
           <div className="form-group">
             <label htmlFor="run-notes">Notas / ¿Cómo te sentiste?</label>

@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Trote App',
     short_name: 'Trote',
-    description: 'Planificador y calendario interactivo de trote y metas',
+    description: 'Registro de entrenamientos de trote, metas y evolución',
     start_url: '/',
     display: 'standalone',
     background_color: '#09090b',

@@ -6,11 +6,15 @@ import MetricsDashboard from "@/components/MetricsDashboard";
 import RunCalendar from "@/components/RunCalendar";
 import RunModal from "@/components/RunModal";
 import GoalsModal from "@/components/GoalsModal";
-import TrainingPlan from "@/components/TrainingPlan";
+// Plan 10K desactivado: la app ahora se enfoca en monitorear la evolución
+// import TrainingPlan from "@/components/TrainingPlan";
+import TrainingEvolution from "@/components/TrainingEvolution";
+import PreferencesModal from "@/components/PreferencesModal";
 import AuthForm from "@/components/AuthForm";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
-import { TRAINING_PLAN_10K } from "@/lib/planData";
+// import { TRAINING_PLAN_10K } from "@/lib/planData";
+import { usePreferences } from "@/lib/preferences";
 import styles from "./page.module.css";
 
 interface Run {
@@ -48,17 +52,26 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<"progress" | "plan">("progress");
+  const [activeTab, setActiveTab] = useState<"progress" | "evolution">(
+    "progress",
+  );
+
+  // Preferences (rucking hidden by default)
+  const [preferences, updatePreferences] = usePreferences();
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
+  const visibleRuns = preferences.showRucking
+    ? runs
+    : runs.filter((r) => r.type !== "rucking");
 
   // Modals state
   const [isRunModalOpen, setIsRunModalOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
   const [editingRun, setEditingRun] = useState<Run | null>(null);
 
-  // Hidden plan contexts for RunModal
-  const [planDefaultType, setPlanDefaultType] = useState("run");
-  const [planDefaultWeek, setPlanDefaultWeek] = useState<number | null>(null);
-  const [planDefaultDay, setPlanDefaultDay] = useState<number | null>(null);
+  // Plan 10K desactivado: contextos ocultos del plan para RunModal
+  // const [planDefaultType, setPlanDefaultType] = useState("run");
+  // const [planDefaultWeek, setPlanDefaultWeek] = useState<number | null>(null);
+  // const [planDefaultDay, setPlanDefaultDay] = useState<number | null>(null);
 
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [selectedGoalType, setSelectedGoalType] = useState<
@@ -260,9 +273,12 @@ export default function Home() {
     avg_bpm?: number | null;
     rucking_weight?: number | null;
   }) => {
-    let matchedWeek = runData.plan_week;
-    let matchedDay = runData.plan_day;
+    // Plan 10K desactivado: se conservan los vínculos existentes, pero ya no
+    // se detectan automáticamente nuevas sesiones del plan.
+    const matchedWeek = runData.plan_week;
+    const matchedDay = runData.plan_day;
 
+    /* Plan 10K desactivado: reconocimiento automático de sesiones del plan
     // Auto-detect matching training plan workouts only on creation (new run) and if not already manually linked
     if (!runData.id && !runData.plan_week && !runData.plan_day) {
       // 1st Condition: check if all workouts are already completed
@@ -321,6 +337,8 @@ export default function Home() {
         }
       }
     }
+
+    */
 
     const finalRunData = {
       ...runData,
@@ -494,10 +512,11 @@ export default function Home() {
 
   // Modal Triggers for Calendar / Quick Log
   const handleSelectDate = (dateStr: string, existingRun?: Run) => {
-    // Reset plan contextual defaults so we don't accidentally link them
-    setPlanDefaultWeek(null);
-    setPlanDefaultDay(null);
-    setPlanDefaultType("run");
+    // Plan 10K desactivado
+    // // Reset plan contextual defaults so we don't accidentally link them
+    // setPlanDefaultWeek(null);
+    // setPlanDefaultDay(null);
+    // setPlanDefaultType("run");
 
     setSelectedDate(dateStr);
     setEditingRun(existingRun || null);
@@ -509,6 +528,7 @@ export default function Home() {
     handleSelectDate(todayStr);
   };
 
+/* Plan 10K desactivado
   // Modal Trigger for Plan Workouts
   const handleSelectPlanWorkout = (
     weekNum: number,
@@ -526,6 +546,7 @@ export default function Home() {
     setEditingRun(existingRun || null);
     setIsRunModalOpen(true);
   };
+*/
 
   const handleEditGoals = (type: "weekly" | "monthly") => {
     setSelectedGoalType(type);
@@ -555,6 +576,7 @@ export default function Home() {
         isCloudSynced={!useLocalMode}
         userEmail={useLocalMode ? null : user?.email}
         onLogout={handleLogout}
+        onPreferencesClick={() => setIsPreferencesOpen(true)}
         onLoginClick={
           isSupabaseConfigured ? () => setUseLocalMode(false) : undefined
         }
@@ -624,6 +646,26 @@ export default function Home() {
           </button>
 
           <button
+            className={`${styles.tabBtn} ${activeTab === "evolution" ? styles.activeTabBtn : ""}`}
+            onClick={() => setActiveTab("evolution")}
+          >
+            <svg
+              className={styles.tabIcon}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+              <polyline points="16 7 22 7 22 13" />
+            </svg>
+            <span>Mi Evolución</span>
+          </button>
+
+          {/* Plan 10K desactivado
+          <button
             className={`${styles.tabBtn} ${activeTab === "plan" ? styles.activeTabBtn : ""}`}
             onClick={() => setActiveTab("plan")}
           >
@@ -643,6 +685,7 @@ export default function Home() {
             </svg>
             <span>Plan de Entrenamiento 10K</span>
           </button>
+          */}
         </div>
       </div>
 
@@ -651,7 +694,7 @@ export default function Home() {
         <>
           <div className={styles.calendarSection}>
             <RunCalendar
-              runs={runs}
+              runs={visibleRuns}
               onSelectDate={handleSelectDate}
               onQuickLog={handleQuickLog}
             />
@@ -659,17 +702,18 @@ export default function Home() {
 
           <div className={styles.dashboardSection}>
             <MetricsDashboard
-              runs={runs}
+              runs={visibleRuns}
               weeklyGoal={weeklyGoal}
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
               showOnly="stats"
+              showRucking={preferences.showRucking}
             />
           </div>
 
           <div className={styles.dashboardSection}>
             <MetricsDashboard
-              runs={runs}
+              runs={visibleRuns}
               weeklyGoal={weeklyGoal}
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
@@ -679,7 +723,17 @@ export default function Home() {
         </>
       )}
 
-      {/* VISTA 2: PLAN 10K */}
+      {/* VISTA 2: EVOLUCIÓN */}
+      {activeTab === "evolution" && (
+        <div className={styles.planSection}>
+          <TrainingEvolution
+            runs={visibleRuns}
+            showRucking={preferences.showRucking}
+          />
+        </div>
+      )}
+
+      {/* Plan 10K desactivado
       {activeTab === "plan" && (
         <div className={styles.planSection}>
           <TrainingPlan
@@ -688,6 +742,7 @@ export default function Home() {
           />
         </div>
       )}
+      */}
 
       {/* CARGANDO OVERLAY */}
       {isLoading && (
@@ -707,9 +762,11 @@ export default function Home() {
         onClose={() => setIsRunModalOpen(false)}
         selectedDate={selectedDate}
         existingRun={editingRun}
-        defaultType={planDefaultType}
-        defaultPlanWeek={planDefaultWeek}
-        defaultPlanDay={planDefaultDay}
+        showRucking={preferences.showRucking}
+        // Plan 10K desactivado
+        // defaultType={planDefaultType}
+        // defaultPlanWeek={planDefaultWeek}
+        // defaultPlanDay={planDefaultDay}
         onSubmit={handleRunSubmit}
         onDelete={handleRunDelete}
       />
@@ -725,6 +782,13 @@ export default function Home() {
         type={selectedGoalType}
         existingGoal={activeGoalForModal}
         onSubmit={handleGoalSubmit}
+      />
+
+      <PreferencesModal
+        isOpen={isPreferencesOpen}
+        onClose={() => setIsPreferencesOpen(false)}
+        preferences={preferences}
+        onChange={updatePreferences}
       />
     </main>
   );

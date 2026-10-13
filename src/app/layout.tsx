@@ -3,7 +3,7 @@ import './globals.css';
 import PWARegister from '@/components/PWARegister';
 
 export const metadata: Metadata = {
-  title: 'Trote App - Planificador & Calendario',
+  title: 'Trote App - Entrenamientos y Evolución',
   description: 'Mantén un plan de ejercicio de trotar semanal y mensual, define tus metas y registra tus entrenamientos en el calendario.',
   manifest: '/manifest.webmanifest',
   appleWebApp: {

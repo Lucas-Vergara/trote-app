@@ -116,7 +116,7 @@ export default function AuthForm({
             Trote<span className="text-gradient">App</span>
           </h1>
           <p className={styles.tagline}>
-            Tu planificador privado de carrera 10K
+            Tu registro privado de entrenamientos
           </p>
         </div>
 

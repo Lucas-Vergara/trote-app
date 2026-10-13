@@ -26,6 +26,7 @@ interface MetricsDashboardProps {
   monthlyGoal: Goal | null;
   onEditGoals: (type: "weekly" | "monthly") => void;
   showOnly?: "goals" | "stats" | "all";
+  showRucking?: boolean;
 }
 
 // SVG Progress Ring generator
@@ -80,6 +81,7 @@ export default function MetricsDashboard({
   monthlyGoal,
   onEditGoals,
   showOnly = "all",
+  showRucking = false,
 }: MetricsDashboardProps) {
   const [activeTab, setActiveTab] = useState<"semanal" | "mensual" | "anual">(
     "semanal",
@@ -262,7 +264,7 @@ export default function MetricsDashboard({
   };
 
   const renderRendimientoValue = () => {
-    if (totalDistanceTrote > 0 && avgRuckingWeight > 0) {
+    if (totalDistanceTrote > 0 && avgRuckingWeight > 0 && showRucking) {
       return (
         <span className={styles.boxValueSplit}>
           <span className={styles.boxValueTroteSub}>
@@ -282,7 +284,7 @@ export default function MetricsDashboard({
           <span className={styles.boxUnit}>min/km</span>
         </>
       );
-    } else if (avgRuckingWeight > 0) {
+    } else if (avgRuckingWeight > 0 && showRucking) {
       return (
         <>
           {avgRuckingWeight.toFixed(1)}{" "}
@@ -487,12 +489,14 @@ export default function MetricsDashboard({
                     {totalDistanceTrote.toFixed(1)} km
                   </span>
                 </div>
-                <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                  <span className={styles.breakdownValue}>
-                    {totalDistanceRucking.toFixed(1)} km
-                  </span>
-                </div>
+                {showRucking && (
+                  <div className={styles.breakdownRow}>
+                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                    <span className={styles.breakdownValue}>
+                      {totalDistanceRucking.toFixed(1)} km
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -507,12 +511,14 @@ export default function MetricsDashboard({
                     {totalRunsTrote} ses.
                   </span>
                 </div>
-                <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                  <span className={styles.breakdownValue}>
-                    {totalRunsRucking} ses.
-                  </span>
-                </div>
+                {showRucking && (
+                  <div className={styles.breakdownRow}>
+                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                    <span className={styles.breakdownValue}>
+                      {totalRunsRucking} ses.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -527,12 +533,14 @@ export default function MetricsDashboard({
                   <span className={styles.breakdownLabel}>🏃 Ritmo Trote</span>
                   <span className={styles.breakdownValue}>{trotePaceStr}</span>
                 </div>
-                <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🎒 Peso Rucking</span>
-                  <span className={styles.breakdownValue}>
-                    {ruckingWeightStr}
-                  </span>
-                </div>
+                {showRucking && (
+                  <div className={styles.breakdownRow}>
+                    <span className={styles.breakdownLabel}>🎒 Peso Rucking</span>
+                    <span className={styles.breakdownValue}>
+                      {ruckingWeightStr}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -549,12 +557,14 @@ export default function MetricsDashboard({
                     {formatDuration(totalDurationTrote)}
                   </span>
                 </div>
-                <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                  <span className={styles.breakdownValue}>
-                    {formatDuration(totalDurationRucking)}
-                  </span>
-                </div>
+                {showRucking && (
+                  <div className={styles.breakdownRow}>
+                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                    <span className={styles.breakdownValue}>
+                      {formatDuration(totalDurationRucking)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
