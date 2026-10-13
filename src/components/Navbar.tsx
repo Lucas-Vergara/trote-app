@@ -7,9 +7,11 @@ interface NavbarProps {
   onLogout?: () => void;
   onLoginClick?: () => void;
   onPreferencesClick?: () => void;
+  onSyncClick?: () => void;
+  isSyncing?: boolean;
 }
 
-export default function Navbar({ isCloudSynced, userEmail, onLogout, onLoginClick, onPreferencesClick }: NavbarProps) {
+export default function Navbar({ isCloudSynced, userEmail, onLogout, onLoginClick, onPreferencesClick, onSyncClick, isSyncing }: NavbarProps) {
   // Extract name prefix from email (e.g. lucas@example.com -> lucas)
   const displayName = userEmail ? userEmail.split('@')[0] : '';
 
@@ -48,6 +50,22 @@ export default function Navbar({ isCloudSynced, userEmail, onLogout, onLoginClic
               </>
             )}
           </div>
+
+          {onSyncClick && (
+            <button
+              className={styles.prefsBtn}
+              onClick={onSyncClick}
+              disabled={isSyncing}
+              aria-label="Sincronizar con Zepp"
+              title="Sincronizar con Zepp"
+            >
+              <svg className={`${styles.prefsIcon} ${isSyncing ? styles.spinning : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+          )}
 
           {onPreferencesClick && (
             <button className={styles.prefsBtn} onClick={onPreferencesClick} aria-label="Preferencias" title="Preferencias">

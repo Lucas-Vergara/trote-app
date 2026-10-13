@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useEffectEvent } from "react";
 import Navbar from "@/components/Navbar";
 import MetricsDashboard from "@/components/MetricsDashboard";
 import RunCalendar from "@/components/RunCalendar";
@@ -72,6 +72,10 @@ export default function Home() {
   // const [planDefaultType, setPlanDefaultType] = useState("run");
   // const [planDefaultWeek, setPlanDefaultWeek] = useState<number | null>(null);
   // const [planDefaultDay, setPlanDefaultDay] = useState<number | null>(null);
+
+  // Zepp (Intervals.icu) sync state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [selectedGoalType, setSelectedGoalType] = useState<
@@ -259,6 +263,89 @@ export default function Home() {
 
     loadData();
   }, [useLocalMode, user]);
+
+  // Sync runs recorded in Zepp through Intervals.icu (server route keeps the API key)
+  const syncFromZepp = async (manual: boolean) => {
+    if (!isSupabaseConfigured || useLocalMode || !user) return;
+    const LAST_SYNC_KEY = "trote_last_zepp_sync";
+    let lastSync: number | null = null;
+    try {
+      const raw = localStorage.getItem(LAST_SYNC_KEY);
+      lastSync = raw ? Number(raw) : null;
+    } catch {
+      lastSync = null;
+    }
+    // Automatic sync at most every 30 minutes
+    if (!manual && lastSync && Date.now() - lastSync < 30 * 60 * 1000) return;
+
+    setIsSyncing(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) return;
+
+      // First sync brings the last year; afterwards, the last 30 days
+      const res = await fetch("/api/sync/intervals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ days: lastSync ? 30 : 365 }),
+      });
+      const result = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // 501/403: sync not configured for this deployment/account; stay quiet unless asked
+        if (manual || (res.status !== 501 && res.status !== 403)) {
+          setSyncMessage(`⚠️ ${result.error || "No se pudo sincronizar con Zepp."}`);
+        }
+        return;
+      }
+
+      try {
+        localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+      } catch {
+        // ignore storage errors
+      }
+
+      if (result.imported > 0 || result.linked > 0) {
+        const { data } = await supabase
+          .from("runs")
+          .select("*")
+          .order("date", { ascending: false });
+        setRuns(data || []);
+        const parts = [];
+        if (result.imported > 0)
+          parts.push(
+            `${result.imported} ${result.imported === 1 ? "trote importado" : "trotes importados"}`,
+          );
+        if (result.linked > 0)
+          parts.push(
+            `${result.linked} ${result.linked === 1 ? "vinculado" : "vinculados"} con registros existentes`,
+          );
+        setSyncMessage(`✅ ${parts.join(" y ")} desde Zepp.`);
+      } else if (manual) {
+        setSyncMessage("✅ Todo al día: no hay trotes nuevos en Zepp.");
+      }
+    } catch (err) {
+      console.error("Error sincronizando con Zepp:", err);
+      if (manual) setSyncMessage("⚠️ Error de red al sincronizar con Zepp.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Auto-sync from Zepp once the cloud data has loaded
+  const onCloudReady = useEffectEvent(() => {
+    syncFromZepp(false);
+  });
+  useEffect(() => {
+    if (!user || useLocalMode) return;
+    const timer = setTimeout(onCloudReady, 0);
+    return () => clearTimeout(timer);
+  }, [user, useLocalMode]);
 
   // Run Mutations: Add/Edit
   const handleRunSubmit = async (runData: {
@@ -577,6 +664,12 @@ export default function Home() {
         userEmail={useLocalMode ? null : user?.email}
         onLogout={handleLogout}
         onPreferencesClick={() => setIsPreferencesOpen(true)}
+        onSyncClick={
+          isSupabaseConfigured && !useLocalMode && user
+            ? () => syncFromZepp(true)
+            : undefined
+        }
+        isSyncing={isSyncing}
         onLoginClick={
           isSupabaseConfigured ? () => setUseLocalMode(false) : undefined
         }
@@ -598,6 +691,20 @@ export default function Home() {
                 <code>.env.local</code>.
               </p>
             </div>
+          </div>
+        )}
+
+        {syncMessage && (
+          <div className={`${styles.alertBanner} glass-panel fade-in`}>
+            <div className={styles.alertContent}>
+              <p className={styles.alertText}>{syncMessage}</p>
+            </div>
+            <button
+              className={styles.bannerCloseBtn}
+              onClick={() => setSyncMessage(null)}
+            >
+              Cerrar
+            </button>
           </div>
         )}
 

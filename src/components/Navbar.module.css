@@ -217,3 +217,18 @@
   width: 16px;
   height: 16px;
 }
+
+.prefsBtn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.spinning {
+  animation: navSpin 1s linear infinite;
+}
+
+@keyframes navSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
