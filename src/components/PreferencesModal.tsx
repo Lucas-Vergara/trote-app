@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Preferences } from "@/lib/preferences";
+import { formatPace } from "@/lib/weeklyRecommendation";
 import modalStyles from "./RunModal.module.css";
 import styles from "./PreferencesModal.module.css";
 
@@ -16,7 +17,34 @@ export default function PreferencesModal({
   preferences,
   onChange,
 }: PreferencesModalProps) {
+  const [paceText, setPaceText] = useState(formatPace(preferences.paceGoal.pace));
+  const [hrText, setHrText] = useState(String(preferences.paceGoal.maxHR));
+
   if (!isOpen) return null;
+
+  // Acepta "8:30" o "8.5"; si no es válido, vuelve al valor guardado
+  const savePace = () => {
+    const m = paceText.trim().match(/^(\d{1,2})(?::(\d{1,2}))?$|^(\d{1,2}[.,]\d+)$/);
+    const pace = m
+      ? m[3]
+        ? Number(m[3].replace(",", "."))
+        : Number(m[1]) + Number(m[2] || 0) / 60
+      : NaN;
+    if (pace >= 4 && pace <= 15) {
+      onChange({ paceGoal: { ...preferences.paceGoal, pace } });
+      setPaceText(formatPace(pace));
+    } else {
+      setPaceText(formatPace(preferences.paceGoal.pace));
+    }
+  };
+  const saveHR = () => {
+    const maxHR = Math.round(Number(hrText));
+    if (maxHR >= 100 && maxHR <= 200) {
+      onChange({ paceGoal: { ...preferences.paceGoal, maxHR } });
+    } else {
+      setHrText(String(preferences.paceGoal.maxHR));
+    }
+  };
 
   return (
     <div className={modalStyles.overlay} onClick={onClose}>
@@ -45,6 +73,39 @@ export default function PreferencesModal({
         </div>
 
         <div className={styles.optionList}>
+          <div className={styles.optionRow}>
+            <div className={styles.optionText}>
+              <span className={styles.optionTitle}>🎯 Objetivo de ritmo</span>
+              <span className={styles.optionDescription}>
+                El ritmo que quieres sostener en zona 2 y el pulso medio que no
+                debe pasar. El plan de la semana ajusta solo el volumen y las
+                sesiones para llegar ahí.
+              </span>
+              <div className={styles.goalFields}>
+                <label className={styles.goalField}>
+                  <span>Ritmo (min/km)</span>
+                  <input
+                    className={styles.goalInput}
+                    inputMode="decimal"
+                    value={paceText}
+                    onChange={(e) => setPaceText(e.target.value)}
+                    onBlur={savePace}
+                  />
+                </label>
+                <label className={styles.goalField}>
+                  <span>Pulso máximo (ppm)</span>
+                  <input
+                    className={styles.goalInput}
+                    inputMode="numeric"
+                    value={hrText}
+                    onChange={(e) => setHrText(e.target.value)}
+                    onBlur={saveHR}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
           <label className={styles.optionRow}>
             <div className={styles.optionText}>
               <span className={styles.optionTitle}>🎒 Mostrar Rucking</span>

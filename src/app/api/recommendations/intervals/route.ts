@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 // Entrega a la pestaña de recomendaciones los datos de estado físico que vienen
 // de Intervals.icu: forma/fatiga (CTL/ATL), HRV, pulso en reposo, sueño, carga
-// de los trotes recientes y las zonas de pulso configuradas.
+// y deriva de pulso de los trotes recientes, y las zonas de pulso configuradas.
 // La clave de Intervals.icu solo vive en el servidor.
 
 const RUN_TYPES = new Set(["Run", "TrailRun", "VirtualRun"]);
@@ -29,6 +29,7 @@ interface IntervalsActivity {
   moving_time?: number | null;
   average_heartrate?: number | null;
   icu_training_load?: number | null;
+  decoupling?: number | null; // deriva del pulso respecto del ritmo, en %
 }
 
 interface SportSettings {
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
 
   const today = new Date().toISOString().split("T")[0];
   const activityFields =
-    "id,start_date_local,type,distance,moving_time,average_heartrate,icu_training_load";
+    "id,start_date_local,type,distance,moving_time,average_heartrate,icu_training_load,decoupling";
 
   const [wellness, activities, athlete] = await Promise.all([
     get<IntervalsWellness[]>(
@@ -135,7 +136,9 @@ export async function POST(request: Request) {
         minutes: Math.round((a.moving_time || 0) / 60),
         avgHR: num(a.average_heartrate),
         load: num(a.icu_training_load),
-      })),
+        decoupling: num(a.decoupling),
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
     zone2,
     maxHR: num(runSettings?.max_hr),
   });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useEffectEvent } from "react";
+import React, { useState, useEffect, useEffectEvent, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import MetricsDashboard from "@/components/MetricsDashboard";
 import RunCalendar from "@/components/RunCalendar";
@@ -10,12 +10,15 @@ import GoalsModal from "@/components/GoalsModal";
 // import TrainingPlan from "@/components/TrainingPlan";
 import TrainingEvolution from "@/components/TrainingEvolution";
 import WeeklyRecommendation from "@/components/WeeklyRecommendation";
+import PaceGoalCard from "@/components/PaceGoalCard";
 import PreferencesModal from "@/components/PreferencesModal";
 import AuthForm from "@/components/AuthForm";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 // import { TRAINING_PLAN_10K } from "@/lib/planData";
 import { usePreferences } from "@/lib/preferences";
+import { useIntervalsData } from "@/lib/useIntervalsData";
+import { buildWeekPlan } from "@/lib/weeklyRecommendation";
 import styles from "./page.module.css";
 
 interface Run {
@@ -42,7 +45,6 @@ interface Goal {
 
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([]);
-  const [weeklyGoal, setWeeklyGoal] = useState<Goal | null>(null);
   const [monthlyGoal, setMonthlyGoal] = useState<Goal | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -63,6 +65,18 @@ export default function Home() {
   const visibleRuns = preferences.showRucking
     ? runs
     : runs.filter((r) => r.type !== "rucking");
+
+  // Plan de la semana: volumen y sesiones dinámicos según el objetivo de ritmo
+  const intervals = useIntervalsData(Boolean(user) && !useLocalMode);
+  const weekPlan = useMemo(
+    () =>
+      buildWeekPlan(
+        runs,
+        intervals.status === "ready" ? intervals.data : null,
+        preferences.paceGoal,
+      ),
+    [runs, intervals, preferences.paceGoal],
+  );
 
   // Modals state
   const [isRunModalOpen, setIsRunModalOpen] = useState(false);
@@ -87,7 +101,6 @@ export default function Home() {
   function loadLocalData() {
     try {
       const cachedRuns = localStorage.getItem("trote_runs");
-      const cachedWeeklyGoal = localStorage.getItem("trote_weekly_goal");
       const cachedMonthlyGoal = localStorage.getItem("trote_monthly_goal");
 
       if (cachedRuns) {
@@ -129,28 +142,6 @@ export default function Home() {
         ];
         setRuns(mockRuns);
         localStorage.setItem("trote_runs", JSON.stringify(mockRuns));
-      }
-
-      if (cachedWeeklyGoal) {
-        setWeeklyGoal(JSON.parse(cachedWeeklyGoal));
-      } else {
-        // Mock weekly goal
-        const now = new Date();
-        const monday = new Date(now);
-        monday.setDate(
-          now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1),
-        );
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        const wGoal: Goal = {
-          type: "weekly",
-          target_distance: 20,
-          target_runs: 3,
-          start_date: monday.toISOString().split("T")[0],
-          end_date: sunday.toISOString().split("T")[0],
-        };
-        setWeeklyGoal(wGoal);
-        localStorage.setItem("trote_weekly_goal", JSON.stringify(wGoal));
       }
 
       if (cachedMonthlyGoal) {
@@ -198,7 +189,6 @@ export default function Home() {
         } else {
           // Reset data when logging out
           setRuns([]);
-          setWeeklyGoal(null);
           setMonthlyGoal(null);
         }
       });
@@ -239,9 +229,7 @@ export default function Home() {
           } else {
             setRuns(runsData || []);
 
-            const wGoal = goalsData?.find((g) => g.type === "weekly") || null;
             const mGoal = goalsData?.find((g) => g.type === "monthly") || null;
-            setWeeklyGoal(wGoal);
             setMonthlyGoal(mGoal);
             setDbError(null);
           }
@@ -542,10 +530,7 @@ export default function Home() {
         ...goalData,
       };
 
-      if (goalData.type === "weekly") {
-        setWeeklyGoal(updatedGoal);
-        localStorage.setItem("trote_weekly_goal", JSON.stringify(updatedGoal));
-      } else {
+      if (goalData.type === "monthly") {
         setMonthlyGoal(updatedGoal);
         localStorage.setItem("trote_monthly_goal", JSON.stringify(updatedGoal));
       }
@@ -579,7 +564,6 @@ export default function Home() {
 
         // Reload goals
         const { data } = await supabase.from("goals").select("*");
-        setWeeklyGoal(data?.find((g) => g.type === "weekly") || null);
         setMonthlyGoal(data?.find((g) => g.type === "monthly") || null);
       } catch (err) {
         console.error("Error guardando meta en Supabase:", err);
@@ -641,8 +625,7 @@ export default function Home() {
     setIsGoalsModalOpen(true);
   };
 
-  const activeGoalForModal =
-    selectedGoalType === "weekly" ? weeklyGoal : monthlyGoal;
+  const activeGoalForModal = selectedGoalType === "monthly" ? monthlyGoal : null;
 
   // ROUTE PROTECTION: Show login page if Supabase is active, but we are not logged in and not in local mode
   if (isSupabaseConfigured && !useLocalMode && !user && !isLoading) {
@@ -829,7 +812,6 @@ export default function Home() {
           <div className={styles.dashboardSection}>
             <MetricsDashboard
               runs={visibleRuns}
-              weeklyGoal={weeklyGoal}
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
               showOnly="stats"
@@ -840,7 +822,12 @@ export default function Home() {
           <div className={styles.dashboardSection}>
             <MetricsDashboard
               runs={visibleRuns}
-              weeklyGoal={weeklyGoal}
+              weeklyCard={
+                <PaceGoalCard
+                  plan={weekPlan}
+                  onEditGoal={() => setIsPreferencesOpen(true)}
+                />
+              }
               monthlyGoal={monthlyGoal}
               onEditGoals={handleEditGoals}
               showOnly="goals"
@@ -863,9 +850,9 @@ export default function Home() {
       {activeTab === "week" && (
         <div className={styles.planSection}>
           <WeeklyRecommendation
-            runs={runs}
-            weeklyGoal={weeklyGoal}
-            canUseIntervals={Boolean(user) && !useLocalMode}
+            plan={weekPlan}
+            intervals={intervals}
+            onEditGoal={() => setIsPreferencesOpen(true)}
           />
         </div>
       )}
@@ -922,6 +909,7 @@ export default function Home() {
       />
 
       <PreferencesModal
+        key={isPreferencesOpen ? "preferences-open" : "preferences-closed"}
         isOpen={isPreferencesOpen}
         onClose={() => setIsPreferencesOpen(false)}
         preferences={preferences}

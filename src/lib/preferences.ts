@@ -1,12 +1,15 @@
 import { useCallback, useSyncExternalStore } from "react";
+import { DEFAULT_PACE_GOAL, PaceGoal } from "@/lib/weeklyRecommendation";
 
 // Preferencias de visualización, guardadas en este dispositivo (localStorage)
 export interface Preferences {
   showRucking: boolean;
+  paceGoal: PaceGoal;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   showRucking: false,
+  paceGoal: DEFAULT_PACE_GOAL,
 };
 
 const STORAGE_KEY = "trote_preferences";
@@ -25,7 +28,14 @@ function readPreferences(): Preferences {
 
   let value = DEFAULT_PREFERENCES;
   try {
-    if (raw) value = { ...DEFAULT_PREFERENCES, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      value = {
+        ...DEFAULT_PREFERENCES,
+        ...parsed,
+        paceGoal: { ...DEFAULT_PACE_GOAL, ...parsed.paceGoal },
+      };
+    }
   } catch {
     value = DEFAULT_PREFERENCES;
   }
