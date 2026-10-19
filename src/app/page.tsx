@@ -9,6 +9,7 @@ import GoalsModal from "@/components/GoalsModal";
 // Plan 10K desactivado: la app ahora se enfoca en monitorear la evolución
 // import TrainingPlan from "@/components/TrainingPlan";
 import TrainingEvolution from "@/components/TrainingEvolution";
+import WeeklyRecommendation from "@/components/WeeklyRecommendation";
 import PreferencesModal from "@/components/PreferencesModal";
 import AuthForm from "@/components/AuthForm";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -52,7 +53,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<"progress" | "evolution">(
+  const [activeTab, setActiveTab] = useState<"progress" | "evolution" | "week">(
     "progress",
   );
 
@@ -771,6 +772,24 @@ export default function Home() {
             <span>Mi Evolución</span>
           </button>
 
+          <button
+            className={`${styles.tabBtn} ${activeTab === "week" ? styles.activeTabBtn : ""}`}
+            onClick={() => setActiveTab("week")}
+          >
+            <svg
+              className={styles.tabIcon}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2l2.4 6.9H22l-6 4.6 2.3 7L12 16.3 5.7 20.5 8 13.5 2 8.9h7.6z" />
+            </svg>
+            <span>Mi Semana</span>
+          </button>
+
           {/* Plan 10K desactivado
           <button
             className={`${styles.tabBtn} ${activeTab === "plan" ? styles.activeTabBtn : ""}`}
@@ -836,6 +855,17 @@ export default function Home() {
           <TrainingEvolution
             runs={visibleRuns}
             showRucking={preferences.showRucking}
+          />
+        </div>
+      )}
+
+      {/* VISTA 3: RECOMENDACIONES DE LA SEMANA */}
+      {activeTab === "week" && (
+        <div className={styles.planSection}>
+          <WeeklyRecommendation
+            runs={runs}
+            weeklyGoal={weeklyGoal}
+            canUseIntervals={Boolean(user) && !useLocalMode}
           />
         </div>
       )}
