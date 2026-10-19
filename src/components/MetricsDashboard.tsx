@@ -11,77 +11,13 @@ interface Run {
   rucking_weight?: number | null;
 }
 
-interface Goal {
-  id?: string;
-  type: "weekly" | "monthly";
-  target_distance: number;
-  target_runs: number;
-  start_date: string;
-  end_date: string;
-}
-
 interface MetricsDashboardProps {
   runs: Run[];
-  // Tarjeta de la semana (objetivo de ritmo y volumen dinámico)
-  weeklyCard?: React.ReactNode;
-  monthlyGoal: Goal | null;
-  onEditGoals: (type: "weekly" | "monthly") => void;
-  showOnly?: "goals" | "stats" | "all";
   showRucking?: boolean;
 }
 
-// SVG Progress Ring generator
-const ProgressRing = ({
-  percentage,
-  colorClass,
-}: {
-  percentage: number;
-  colorClass: string;
-}) => {
-  const radius = 32;
-  const strokeWidth = 6;
-  const normalizedRadius = radius - strokeWidth * 2;
-  const circumference = normalizedRadius * 2 * Math.PI;
-  const safePct = isNaN(percentage)
-    ? 0
-    : Math.min(100, Math.max(0, percentage));
-  const strokeDashoffset = circumference - (safePct / 100) * circumference;
-
-  return (
-    <div className={styles.progressRingWrapper}>
-      <svg height={radius * 2} width={radius * 2}>
-        <circle
-          stroke="#333"
-          fill="transparent"
-          strokeWidth={strokeWidth}
-          r={normalizedRadius}
-          cx={radius}
-          cy={radius}
-        />
-        <circle
-          className={colorClass}
-          stroke="currentColor"
-          fill="transparent"
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference + " " + circumference}
-          style={{ strokeDashoffset }}
-          strokeLinecap="round"
-          r={normalizedRadius}
-          cx={radius}
-          cy={radius}
-        />
-      </svg>
-      <div className={styles.progressText}>{Math.round(safePct)}%</div>
-    </div>
-  );
-};
-
 export default function MetricsDashboard({
   runs,
-  weeklyCard,
-  monthlyGoal,
-  onEditGoals,
-  showOnly = "all",
   showRucking = false,
 }: MetricsDashboardProps) {
   const [activeTab, setActiveTab] = useState<"semanal" | "mensual" | "anual">(
@@ -128,21 +64,6 @@ export default function MetricsDashboard({
     const lastDay = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
     return { start: firstDay, end: lastDay };
   };
-
-  const monthRange = getCurrentMonthRange();
-
-  // Filter runs for the monthly goal
-  const monthlyRuns = runs.filter((run) => {
-    const runDate = new Date(run.date + "T00:00:00");
-    return runDate >= monthRange.start && runDate <= monthRange.end;
-  });
-
-  // Calculate achievements for goals progress rings
-  const monthlyDistance = monthlyRuns.reduce(
-    (sum, run) => sum + Number(run.distance || 0),
-    0,
-  );
-  const monthlyCount = monthlyRuns.length;
 
   // Filter runs for the active tab (period range)
   const filteredRunsForStats = useMemo(() => {
@@ -285,215 +206,132 @@ export default function MetricsDashboard({
     }
   };
 
-  // Percentages for rings
-  const monthDistPct = monthlyGoal
-    ? (monthlyDistance / monthlyGoal.target_distance) * 100
-    : 0;
-  const monthRunsPct = monthlyGoal
-    ? (monthlyCount / monthlyGoal.target_runs) * 100
-    : 0;
-  const monthOverallPct = monthlyGoal ? (monthDistPct + monthRunsPct) / 2 : 0;
-
   return (
     <div className={styles.dashboardContainer}>
-      {/* SECCIÓN METAS */}
-      {(showOnly === "all" || showOnly === "goals") && (
-        <div className={styles.goalsGrid}>
-          {/* Semana: objetivo de ritmo y volumen dinámico */}
-          {weeklyCard}
-
-          {/* Meta Mensual */}
-          <div
-            className={`${styles.goalCard} glass-panel fade-in`}
-            style={{ animationDelay: "0.1s" }}
-          >
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Plan Mensual</h3>
-              <button
-                className={styles.editBtn}
-                onClick={() => onEditGoals("monthly")}
-              >
-                {monthlyGoal ? "Editar" : "Configurar"}
-              </button>
-            </div>
-
-            {monthlyGoal ? (
-              <div className={styles.goalBody}>
-                <ProgressRing
-                  percentage={monthOverallPct}
-                  colorClass={styles.colorViolet}
-                />
-                <div className={styles.goalStats}>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Distancia:</span>
-                    <span className={styles.statValue}>
-                      <strong>{monthlyDistance.toFixed(1)}</strong> /{" "}
-                      {monthlyGoal.target_distance} km
-                    </span>
-                  </div>
-                  <div className={styles.progressBarBg}>
-                    <div
-                      className={`${styles.progressBarFill} ${styles.bgViolet}`}
-                      style={{ width: `${Math.min(100, monthDistPct)}%` }}
-                    ></div>
-                  </div>
-
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Sesiones:</span>
-                    <span className={styles.statValue}>
-                      <strong>{monthlyCount}</strong> /{" "}
-                      {monthlyGoal.target_runs}
-                    </span>
-                  </div>
-                  <div className={styles.progressBarBg}>
-                    <div
-                      className={`${styles.progressBarFill} ${styles.bgViolet}`}
-                      style={{ width: `${Math.min(100, monthRunsPct)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.noGoal}>
-                <p>No tienes una meta mensual configurada.</p>
-                <button
-                  className="btn-primary"
-                  onClick={() => onEditGoals("monthly")}
-                >
-                  Crear Meta Mensual
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* SECCIÓN ESTADÍSTICAS POR PERIODO */}
-      {(showOnly === "all" || showOnly === "stats") && (
-        <div
-          className={`${styles.statsCard} glass-panel fade-in`}
-          style={{ animationDelay: "0.2s" }}
-        >
-          <div className={styles.statsHeader}>
-            <h3 className={styles.cardTitle}>Resumen por Periodo</h3>
-            <div className={styles.filterTabs}>
-              <button
-                className={`${styles.filterTabBtn} ${activeTab === "semanal" ? `${styles.activeFilterTab} ${styles.activeSemanal}` : ""}`}
-                onClick={() => setActiveTab("semanal")}
-              >
-                📅 Semanal
-              </button>
-              <button
-                className={`${styles.filterTabBtn} ${activeTab === "mensual" ? `${styles.activeFilterTab} ${styles.activeMensual}` : ""}`}
-                onClick={() => setActiveTab("mensual")}
-              >
-                📆 Mensual
-              </button>
-              <button
-                className={`${styles.filterTabBtn} ${activeTab === "anual" ? `${styles.activeFilterTab} ${styles.activeAnual}` : ""}`}
-                onClick={() => setActiveTab("anual")}
-              >
-                🗓️ Anual
-              </button>
+      <div
+        className={`${styles.statsCard} glass-panel fade-in`}
+        style={{ animationDelay: "0.2s" }}
+      >
+        <div className={styles.statsHeader}>
+          <h3 className={styles.cardTitle}>Resumen por Periodo</h3>
+          <div className={styles.filterTabs}>
+            <button
+              className={`${styles.filterTabBtn} ${activeTab === "semanal" ? `${styles.activeFilterTab} ${styles.activeSemanal}` : ""}`}
+              onClick={() => setActiveTab("semanal")}
+            >
+              📅 Semanal
+            </button>
+            <button
+              className={`${styles.filterTabBtn} ${activeTab === "mensual" ? `${styles.activeFilterTab} ${styles.activeMensual}` : ""}`}
+              onClick={() => setActiveTab("mensual")}
+            >
+              📆 Mensual
+            </button>
+            <button
+              className={`${styles.filterTabBtn} ${activeTab === "anual" ? `${styles.activeFilterTab} ${styles.activeAnual}` : ""}`}
+              onClick={() => setActiveTab("anual")}
+            >
+              🗓️ Anual
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.statsGrid}>
+          {/* Tarjeta 1: Km Totales */}
+          <div className={styles.statBox}>
+            <span className={styles.boxLabel}>Km Totales</span>
+            <span className={`${styles.boxValue} text-gradient`}>
+              {totalDistanceCombined.toFixed(1)}{" "}
+              <span className={styles.boxUnit}>km</span>
+            </span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>
+                  {totalDistanceTrote.toFixed(1)} km
+                </span>
+              </div>
+              {showRucking && (
+                <div className={styles.breakdownRow}>
+                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
+                  <span className={styles.breakdownValue}>
+                    {totalDistanceRucking.toFixed(1)} km
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className={styles.statsGrid}>
-            {/* Tarjeta 1: Km Totales */}
-            <div className={styles.statBox}>
-              <span className={styles.boxLabel}>Km Totales</span>
-              <span className={`${styles.boxValue} text-gradient`}>
-                {totalDistanceCombined.toFixed(1)}{" "}
-                <span className={styles.boxUnit}>km</span>
-              </span>
-              <div className={styles.boxBreakdown}>
+          {/* Tarjeta 2: Entrenamientos */}
+          <div className={styles.statBox}>
+            <span className={styles.boxLabel}>Entrenamientos</span>
+            <span className={styles.boxValue}>{totalRunsCombined}</span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>
+                  {totalRunsTrote} ses.
+                </span>
+              </div>
+              {showRucking && (
                 <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🏃 Trote</span>
+                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
                   <span className={styles.breakdownValue}>
-                    {totalDistanceTrote.toFixed(1)} km
+                    {totalRunsRucking} ses.
                   </span>
                 </div>
-                {showRucking && (
-                  <div className={styles.breakdownRow}>
-                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                    <span className={styles.breakdownValue}>
-                      {totalDistanceRucking.toFixed(1)} km
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
+          </div>
 
-            {/* Tarjeta 2: Entrenamientos */}
-            <div className={styles.statBox}>
-              <span className={styles.boxLabel}>Entrenamientos</span>
-              <span className={styles.boxValue}>{totalRunsCombined}</span>
-              <div className={styles.boxBreakdown}>
+          {/* Tarjeta 3: Rendimiento Promedio */}
+          <div className={styles.statBox}>
+            <span className={styles.boxLabel}>Rendimiento Promedio</span>
+            <div className={styles.boxValueContainer}>
+              {renderRendimientoValue()}
+            </div>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Ritmo Trote</span>
+                <span className={styles.breakdownValue}>{trotePaceStr}</span>
+              </div>
+              {showRucking && (
                 <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🏃 Trote</span>
+                  <span className={styles.breakdownLabel}>🎒 Peso Rucking</span>
                   <span className={styles.breakdownValue}>
-                    {totalRunsTrote} ses.
+                    {ruckingWeightStr}
                   </span>
                 </div>
-                {showRucking && (
-                  <div className={styles.breakdownRow}>
-                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                    <span className={styles.breakdownValue}>
-                      {totalRunsRucking} ses.
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
+          </div>
 
-            {/* Tarjeta 3: Rendimiento Promedio */}
-            <div className={styles.statBox}>
-              <span className={styles.boxLabel}>Rendimiento Promedio</span>
-              <div className={styles.boxValueContainer}>
-                {renderRendimientoValue()}
+          {/* Tarjeta 4: Tiempo Total */}
+          <div className={styles.statBox}>
+            <span className={styles.boxLabel}>Tiempo Total</span>
+            <span className={styles.boxValue}>
+              {formatDuration(totalDurationCombined)}
+            </span>
+            <div className={styles.boxBreakdown}>
+              <div className={styles.breakdownRow}>
+                <span className={styles.breakdownLabel}>🏃 Trote</span>
+                <span className={styles.breakdownValue}>
+                  {formatDuration(totalDurationTrote)}
+                </span>
               </div>
-              <div className={styles.boxBreakdown}>
+              {showRucking && (
                 <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🏃 Ritmo Trote</span>
-                  <span className={styles.breakdownValue}>{trotePaceStr}</span>
-                </div>
-                {showRucking && (
-                  <div className={styles.breakdownRow}>
-                    <span className={styles.breakdownLabel}>🎒 Peso Rucking</span>
-                    <span className={styles.breakdownValue}>
-                      {ruckingWeightStr}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Tarjeta 4: Tiempo Total */}
-            <div className={styles.statBox}>
-              <span className={styles.boxLabel}>Tiempo Total</span>
-              <span className={styles.boxValue}>
-                {formatDuration(totalDurationCombined)}
-              </span>
-              <div className={styles.boxBreakdown}>
-                <div className={styles.breakdownRow}>
-                  <span className={styles.breakdownLabel}>🏃 Trote</span>
+                  <span className={styles.breakdownLabel}>🎒 Rucking</span>
                   <span className={styles.breakdownValue}>
-                    {formatDuration(totalDurationTrote)}
+                    {formatDuration(totalDurationRucking)}
                   </span>
                 </div>
-                {showRucking && (
-                  <div className={styles.breakdownRow}>
-                    <span className={styles.breakdownLabel}>🎒 Rucking</span>
-                    <span className={styles.breakdownValue}>
-                      {formatDuration(totalDurationRucking)}
-                    </span>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -47,8 +47,24 @@ export interface PaceGoal {
 
 export const DEFAULT_PACE_GOAL: PaceGoal = { pace: 8.5, maxHR: 146 };
 
+export interface PacePoint {
+  date: string;
+  eq: number; // ritmo equivalente a maxHR
+  trend: number; // promedio móvil de los últimos 5 trotes
+  pace: number; // ritmo real
+  avgHR: number;
+  km: number;
+}
+
+export interface WeekVolume {
+  weekStart: string;
+  km: number;
+  sessions: number;
+}
+
 export interface PaceProgress {
   goal: PaceGoal;
+  series: PacePoint[]; // últimas 12 semanas
   current: number | null; // ritmo equivalente a maxHR, trotes recientes
   start: number | null; // el mismo ritmo hace ~2 meses, para medir avance
   progressPct: number | null;
@@ -106,6 +122,7 @@ export interface WeekPlan {
   usedIntervals: boolean;
   recovery: RecoveryTips;
   pace: PaceProgress;
+  history: WeekVolume[]; // semanas completas anteriores, de la más antigua a la más reciente
 }
 
 export interface RecoveryTip {
@@ -317,15 +334,17 @@ function analyzePace(
       return {
         date: r.date,
         avgHR: r.avgHR as number,
+        km: r.km,
+        pace,
         eq: pace > 4 && pace < 15 ? equivalentPace(pace, r.avgHR as number, goal, restHR) : null,
       };
     })
-    .filter((s): s is { date: string; avgHR: number; eq: number } => s.eq !== null)
+    .filter((s): s is Omit<PacePoint, "trend"> => s.eq !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const daysAgo = (iso: string) => (today.getTime() - parse(iso).getTime()) / 86400000;
   const recent = samples.filter((s) => daysAgo(s.date) <= 42);
-  const current = recent.length ? median(recent.slice(-5).map((s) => s.eq)) : null;
+  const current = recent.length ? mean(recent.slice(-5).map((s) => s.eq)) : null;
   const older = samples.filter((s) => daysAgo(s.date) > 42 && daysAgo(s.date) <= 84);
   const start = older.length >= 2 ? median(older.slice(0, 5).map((s) => s.eq)) : null;
 
@@ -383,8 +402,13 @@ function analyzePace(
     detail = `Te faltan ${gapSecs} s/km para ${formatPace(goal.pace)}. ${trendText}`;
   }
 
+  const series = samples
+    .map((s, i) => ({ ...s, trend: mean(samples.slice(Math.max(0, i - 4), i + 1).map((x) => x.eq)) }))
+    .filter((s) => daysAgo(s.date) <= 84);
+
   return {
     goal,
+    series,
     current,
     start,
     progressPct,
@@ -428,16 +452,21 @@ export function buildWeekPlan(
 
   const kmOn = (iso: string) => runs.filter((r) => r.date === iso).reduce((s, r) => s + r.km, 0);
 
-  // --- Historial de las últimas 4 semanas completas ---
-  const weeks = [1, 2, 3, 4].map((w) => {
-    const from = addDays(weekStart, -7 * w);
+  // --- Historial de las semanas completas (las 4 últimas guían el volumen) ---
+  const history: WeekVolume[] = Array.from({ length: 11 }, (_, i) => {
+    const from = addDays(weekStart, -7 * (11 - i));
     const to = addDays(from, 7);
     const inWeek = runs.filter((r) => {
       const d = parse(r.date);
       return d >= from && d < to;
     });
-    return { km: inWeek.reduce((s, r) => s + r.km, 0), sessions: new Set(inWeek.map((r) => r.date)).size };
+    return {
+      weekStart: toISO(from),
+      km: inWeek.reduce((s, r) => s + r.km, 0),
+      sessions: new Set(inWeek.map((r) => r.date)).size,
+    };
   });
+  const weeks = history.slice(-4).reverse();
   const hasHistory = weeks.some((w) => w.km > 0);
   const baseKm = weeks[0].km * 0.5 + weeks[1].km * 0.3 + weeks[2].km * 0.2;
   const last4 = runs.filter((r) => parse(r.date) >= addDays(weekStart, -28));
@@ -734,6 +763,7 @@ export function buildWeekPlan(
     paceGuide,
     usedIntervals: Boolean(intervals),
     pace,
+    history,
   };
 }
 
