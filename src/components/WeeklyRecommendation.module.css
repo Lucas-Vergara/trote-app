@@ -1,0 +1,330 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  padding: 24px;
+  border-radius: 24px;
+  min-width: 0;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 14px;
+}
+
+.cardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg-light);
+}
+
+.cardSubtitle {
+  font-size: 13px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+/* HOY */
+.todayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.badge {
+  align-self: flex-start;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.fatigue_baja {
+  color: var(--success-neon);
+  background: rgba(var(--success-neon-rgb), 0.1);
+}
+
+.fatigue_moderada {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+}
+
+.fatigue_alta {
+  color: var(--accent-neon);
+  background: rgba(var(--accent-neon-rgb), 0.1);
+}
+
+.todayTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--fg-light);
+  line-height: 1.25;
+}
+
+.todayDetail {
+  font-size: 15px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+.guides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-light);
+}
+
+/* SEMANA */
+.progressTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-dark-accent);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-neon), var(--secondary-neon));
+  transition: width 0.4s ease;
+}
+
+.dayList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+
+.day {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--bg-dark-accent);
+  border: 1px solid transparent;
+}
+
+.dayToday {
+  border-color: var(--glass-border-focus);
+  background: rgba(var(--primary-neon-rgb), 0.06);
+}
+
+.dayPast {
+  opacity: 0.55;
+}
+
+.dayName {
+  display: flex;
+  flex-direction: column;
+  width: 84px;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg-light);
+}
+
+.dayDate {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-subtle);
+}
+
+.dayBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sessionTitle {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.kind_easy {
+  color: var(--primary-neon);
+}
+
+.kind_long {
+  color: var(--secondary-neon);
+}
+
+.kind_recovery {
+  color: var(--success-neon);
+}
+
+.sessionMeta {
+  font-size: 13px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.done {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--success-neon);
+}
+
+.rest {
+  font-size: 14px;
+  color: var(--fg-subtle);
+}
+
+/* SEÑALES */
+.signals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.signal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--bg-dark-accent);
+  border-left: 4px solid var(--fg-subtle);
+}
+
+.level_ok {
+  border-left-color: var(--success-neon);
+}
+
+.level_warn {
+  border-left-color: #f59e0b;
+}
+
+.level_bad {
+  border-left-color: var(--accent-neon);
+}
+
+.level_info {
+  border-left-color: var(--primary-neon);
+}
+
+.signalLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.signalValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--fg-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.signalHint {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+/* POR QUÉ */
+.reasons {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+}
+
+/* RECUPERACIÓN */
+.recoveryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.recoveryColumn {
+  min-width: 0;
+}
+
+.recoveryHeading {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.tipList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tip {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-dark-accent);
+}
+
+.tipIcon {
+  font-size: 20px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.tipTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg-light);
+}
+
+.tipText {
+  font-size: 13px;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 18px;
+  }
+
+  .todayTitle {
+    font-size: 20px;
+  }
+
+  .dayName {
+    width: 72px;
+  }
+}
