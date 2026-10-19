@@ -5,12 +5,11 @@ import Navbar from "@/components/Navbar";
 import MetricsDashboard from "@/components/MetricsDashboard";
 import RunCalendar from "@/components/RunCalendar";
 import RunModal from "@/components/RunModal";
-import GoalsModal from "@/components/GoalsModal";
 // Plan 10K desactivado: la app ahora se enfoca en monitorear la evolución
 // import TrainingPlan from "@/components/TrainingPlan";
 import TrainingEvolution from "@/components/TrainingEvolution";
 import WeeklyRecommendation from "@/components/WeeklyRecommendation";
-import PaceGoalCard from "@/components/PaceGoalCard";
+import GoalProgress from "@/components/GoalProgress";
 import PreferencesModal from "@/components/PreferencesModal";
 import AuthForm from "@/components/AuthForm";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -34,18 +33,8 @@ interface Run {
   rucking_weight?: number | null;
 }
 
-interface Goal {
-  id?: string;
-  type: "weekly" | "monthly";
-  target_distance: number;
-  target_runs: number;
-  start_date: string;
-  end_date: string;
-}
-
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([]);
-  const [monthlyGoal, setMonthlyGoal] = useState<Goal | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [useLocalMode, setUseLocalMode] = useState(!isSupabaseConfigured);
@@ -92,16 +81,10 @@ export default function Home() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
-  const [selectedGoalType, setSelectedGoalType] = useState<
-    "weekly" | "monthly"
-  >("weekly");
-
   // Load from localStorage (with default mock data if empty)
   function loadLocalData() {
     try {
       const cachedRuns = localStorage.getItem("trote_runs");
-      const cachedMonthlyGoal = localStorage.getItem("trote_monthly_goal");
 
       if (cachedRuns) {
         setRuns(JSON.parse(cachedRuns));
@@ -143,24 +126,6 @@ export default function Home() {
         setRuns(mockRuns);
         localStorage.setItem("trote_runs", JSON.stringify(mockRuns));
       }
-
-      if (cachedMonthlyGoal) {
-        setMonthlyGoal(JSON.parse(cachedMonthlyGoal));
-      } else {
-        // Mock monthly goal
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const mGoal: Goal = {
-          type: "monthly",
-          target_distance: 80,
-          target_runs: 12,
-          start_date: firstDay.toISOString().split("T")[0],
-          end_date: lastDay.toISOString().split("T")[0],
-        };
-        setMonthlyGoal(mGoal);
-        localStorage.setItem("trote_monthly_goal", JSON.stringify(mGoal));
-      }
     } catch (e) {
       console.error("Error leyendo del almacenamiento local:", e);
     }
@@ -189,7 +154,6 @@ export default function Home() {
         } else {
           // Reset data when logging out
           setRuns([]);
-          setMonthlyGoal(null);
         }
       });
 
@@ -211,15 +175,10 @@ export default function Home() {
             .select("*")
             .order("date", { ascending: false });
 
-          // Fetch goals
-          const { data: goalsData, error: goalsError } = await supabase
-            .from("goals")
-            .select("*");
-
-          if (runsError || goalsError) {
+          if (runsError) {
             console.error(
               "Error cargando de Supabase, activando Modo Local:",
-              runsError || goalsError,
+              runsError,
             );
             setDbError(
               "¿Falta ejecutar el script SQL de las tablas? Activando Modo Local de respaldo.",
@@ -228,9 +187,6 @@ export default function Home() {
             loadLocalData();
           } else {
             setRuns(runsData || []);
-
-            const mGoal = goalsData?.find((g) => g.type === "monthly") || null;
-            setMonthlyGoal(mGoal);
             setDbError(null);
           }
         } catch (err) {
@@ -515,64 +471,6 @@ export default function Home() {
     }
   };
 
-  // Goal Mutation: Add/Edit
-  const handleGoalSubmit = async (goalData: {
-    id?: string;
-    type: "weekly" | "monthly";
-    target_distance: number;
-    target_runs: number;
-    start_date: string;
-    end_date: string;
-  }) => {
-    if (useLocalMode) {
-      const updatedGoal: Goal = {
-        id: goalData.id || Math.random().toString(36).substring(2, 9),
-        ...goalData,
-      };
-
-      if (goalData.type === "monthly") {
-        setMonthlyGoal(updatedGoal);
-        localStorage.setItem("trote_monthly_goal", JSON.stringify(updatedGoal));
-      }
-    } else {
-      setIsLoading(true);
-      try {
-        if (goalData.id) {
-          const { error } = await supabase
-            .from("goals")
-            .update({
-              target_distance: goalData.target_distance,
-              target_runs: goalData.target_runs,
-              start_date: goalData.start_date,
-              end_date: goalData.end_date,
-            })
-            .eq("id", goalData.id);
-          if (error) throw error;
-        } else {
-          // user_id is automatically assigned by auth.uid() DEFAULT in database schema
-          const { error } = await supabase.from("goals").insert([
-            {
-              type: goalData.type,
-              target_distance: goalData.target_distance,
-              target_runs: goalData.target_runs,
-              start_date: goalData.start_date,
-              end_date: goalData.end_date,
-            },
-          ]);
-          if (error) throw error;
-        }
-
-        // Reload goals
-        const { data } = await supabase.from("goals").select("*");
-        setMonthlyGoal(data?.find((g) => g.type === "monthly") || null);
-      } catch (err) {
-        console.error("Error guardando meta en Supabase:", err);
-        alert("Error al guardar la meta en la nube.");
-      }
-      setIsLoading(false);
-    }
-  };
-
   // Logout Handler
   const handleLogout = async () => {
     if (isSupabaseConfigured) {
@@ -619,13 +517,6 @@ export default function Home() {
     setIsRunModalOpen(true);
   };
 */
-
-  const handleEditGoals = (type: "weekly" | "monthly") => {
-    setSelectedGoalType(type);
-    setIsGoalsModalOpen(true);
-  };
-
-  const activeGoalForModal = selectedGoalType === "monthly" ? monthlyGoal : null;
 
   // ROUTE PROTECTION: Show login page if Supabase is active, but we are not logged in and not in local mode
   if (isSupabaseConfigured && !useLocalMode && !user && !isLoading) {
@@ -812,25 +703,14 @@ export default function Home() {
           <div className={styles.dashboardSection}>
             <MetricsDashboard
               runs={visibleRuns}
-              monthlyGoal={monthlyGoal}
-              onEditGoals={handleEditGoals}
-              showOnly="stats"
               showRucking={preferences.showRucking}
             />
           </div>
 
           <div className={styles.dashboardSection}>
-            <MetricsDashboard
-              runs={visibleRuns}
-              weeklyCard={
-                <PaceGoalCard
-                  plan={weekPlan}
-                  onEditGoal={() => setIsPreferencesOpen(true)}
-                />
-              }
-              monthlyGoal={monthlyGoal}
-              onEditGoals={handleEditGoals}
-              showOnly="goals"
+            <GoalProgress
+              plan={weekPlan}
+              onEditGoal={() => setIsPreferencesOpen(true)}
             />
           </div>
         </>
@@ -893,19 +773,6 @@ export default function Home() {
         // defaultPlanDay={planDefaultDay}
         onSubmit={handleRunSubmit}
         onDelete={handleRunDelete}
-      />
-
-      <GoalsModal
-        key={
-          isGoalsModalOpen
-            ? `goals-modal-${selectedGoalType}-${activeGoalForModal?.id || "new"}`
-            : "goals-modal-closed"
-        }
-        isOpen={isGoalsModalOpen}
-        onClose={() => setIsGoalsModalOpen(false)}
-        type={selectedGoalType}
-        existingGoal={activeGoalForModal}
-        onSubmit={handleGoalSubmit}
       />
 
       <PreferencesModal
