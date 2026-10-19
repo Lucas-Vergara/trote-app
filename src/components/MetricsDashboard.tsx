@@ -22,7 +22,8 @@ interface Goal {
 
 interface MetricsDashboardProps {
   runs: Run[];
-  weeklyGoal: Goal | null;
+  // Tarjeta de la semana (objetivo de ritmo y volumen dinámico)
+  weeklyCard?: React.ReactNode;
   monthlyGoal: Goal | null;
   onEditGoals: (type: "weekly" | "monthly") => void;
   showOnly?: "goals" | "stats" | "all";
@@ -77,7 +78,7 @@ const ProgressRing = ({
 
 export default function MetricsDashboard({
   runs,
-  weeklyGoal,
+  weeklyCard,
   monthlyGoal,
   onEditGoals,
   showOnly = "all",
@@ -128,27 +129,15 @@ export default function MetricsDashboard({
     return { start: firstDay, end: lastDay };
   };
 
-  const weekRange = getCurrentWeekRange();
   const monthRange = getCurrentMonthRange();
 
-  // Filter runs for goals (keep week/month specific ranges)
-  const weeklyRuns = runs.filter((run) => {
-    const runDate = new Date(run.date + "T00:00:00"); // Prevent timezone shift
-    return runDate >= weekRange.start && runDate <= weekRange.end;
-  });
-
+  // Filter runs for the monthly goal
   const monthlyRuns = runs.filter((run) => {
     const runDate = new Date(run.date + "T00:00:00");
     return runDate >= monthRange.start && runDate <= monthRange.end;
   });
 
   // Calculate achievements for goals progress rings
-  const weeklyDistance = weeklyRuns.reduce(
-    (sum, run) => sum + Number(run.distance || 0),
-    0,
-  );
-  const weeklyCount = weeklyRuns.length;
-
   const monthlyDistance = monthlyRuns.reduce(
     (sum, run) => sum + Number(run.distance || 0),
     0,
@@ -297,14 +286,6 @@ export default function MetricsDashboard({
   };
 
   // Percentages for rings
-  const weekDistPct = weeklyGoal
-    ? (weeklyDistance / weeklyGoal.target_distance) * 100
-    : 0;
-  const weekRunsPct = weeklyGoal
-    ? (weeklyCount / weeklyGoal.target_runs) * 100
-    : 0;
-  const weekOverallPct = weeklyGoal ? (weekDistPct + weekRunsPct) / 2 : 0;
-
   const monthDistPct = monthlyGoal
     ? (monthlyDistance / monthlyGoal.target_distance) * 100
     : 0;
@@ -318,65 +299,8 @@ export default function MetricsDashboard({
       {/* SECCIÓN METAS */}
       {(showOnly === "all" || showOnly === "goals") && (
         <div className={styles.goalsGrid}>
-          {/* Meta Semanal */}
-          <div className={`${styles.goalCard} glass-panel fade-in`}>
-            <div className={styles.cardHeader}>
-              <h3 className={styles.cardTitle}>Plan Semanal</h3>
-              <button
-                className={styles.editBtn}
-                onClick={() => onEditGoals("weekly")}
-              >
-                {weeklyGoal ? "Editar" : "Configurar"}
-              </button>
-            </div>
-
-            {weeklyGoal ? (
-              <div className={styles.goalBody}>
-                <ProgressRing
-                  percentage={weekOverallPct}
-                  colorClass={styles.colorCyan}
-                />
-                <div className={styles.goalStats}>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Distancia:</span>
-                    <span className={styles.statValue}>
-                      <strong>{weeklyDistance.toFixed(1)}</strong> /{" "}
-                      {weeklyGoal.target_distance} km
-                    </span>
-                  </div>
-                  <div className={styles.progressBarBg}>
-                    <div
-                      className={`${styles.progressBarFill} ${styles.bgCyan}`}
-                      style={{ width: `${Math.min(100, weekDistPct)}%` }}
-                    ></div>
-                  </div>
-
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Sesiones:</span>
-                    <span className={styles.statValue}>
-                      <strong>{weeklyCount}</strong> / {weeklyGoal.target_runs}
-                    </span>
-                  </div>
-                  <div className={styles.progressBarBg}>
-                    <div
-                      className={`${styles.progressBarFill} ${styles.bgCyan}`}
-                      style={{ width: `${Math.min(100, weekRunsPct)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className={styles.noGoal}>
-                <p>No tienes una meta semanal configurada.</p>
-                <button
-                  className="btn-primary"
-                  onClick={() => onEditGoals("weekly")}
-                >
-                  Crear Meta Semanal
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Semana: objetivo de ritmo y volumen dinámico */}
+          {weeklyCard}
 
           {/* Meta Mensual */}
           <div

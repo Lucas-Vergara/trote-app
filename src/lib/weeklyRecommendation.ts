@@ -1,13 +1,16 @@
 // Motor de recomendaciones semanales de trote.
-// Pensado para construir base aeróbica en zona 2: subir volumen de a poco,
-// respetar el cansancio (forma/fatiga, HRV, pulso en reposo, sueño) y evitar
-// trotar muchos días seguidos. Todo en hora local, semanas de lunes a domingo.
+// El objetivo es un ritmo en zona 2 (ej. 8:30 min/km sin pasar de 146 ppm):
+// se mide el ritmo que rindes a ese pulso, y el volumen y la cantidad de
+// sesiones de la semana se ajustan solos para mejorarlo sin lesionarte,
+// respetando el cansancio (forma/fatiga, HRV, pulso en reposo, sueño).
+// Todo en hora local, semanas de lunes a domingo.
 
 export interface AppRun {
   date: string;
   distance: number | null;
   duration: number;
   type?: string;
+  avg_bpm?: number | null;
 }
 
 export interface WellnessDay {
@@ -24,14 +27,38 @@ export interface WellnessDay {
 
 export interface IntervalsData {
   wellness: WellnessDay[];
-  runs: { date: string; km: number; minutes: number; avgHR: number | null; load: number | null }[];
+  runs: {
+    date: string;
+    km: number;
+    minutes: number;
+    avgHR: number | null;
+    load: number | null;
+    decoupling: number | null;
+  }[];
   zone2: { min: number; max: number } | null;
   maxHR: number | null;
 }
 
-export interface WeeklyGoalInput {
-  target_distance: number;
-  target_runs: number;
+// Objetivo: trotar a `pace` min/km con pulso medio bajo `maxHR`
+export interface PaceGoal {
+  pace: number;
+  maxHR: number;
+}
+
+export const DEFAULT_PACE_GOAL: PaceGoal = { pace: 8.5, maxHR: 146 };
+
+export interface PaceProgress {
+  goal: PaceGoal;
+  current: number | null; // ritmo equivalente a maxHR, trotes recientes
+  start: number | null; // el mismo ritmo hace ~2 meses, para medir avance
+  progressPct: number | null;
+  trendPerWeek: number | null; // segundos/km por semana (negativo = mejorando)
+  weeksToGoal: number | null;
+  inZoneShare: number | null; // fracción de trotes recientes bajo maxHR
+  samples: number;
+  reached: boolean;
+  headline: string;
+  detail: string;
 }
 
 export type SignalLevel = "ok" | "warn" | "bad" | "info";
@@ -50,6 +77,7 @@ export interface PlannedSession {
   title: string;
   km: number;
   minutes: number;
+  parts?: number[]; // doble: km de cada sesión corta del día
 }
 
 export interface PlanDay {
@@ -77,6 +105,7 @@ export interface WeekPlan {
   paceGuide: string;
   usedIntervals: boolean;
   recovery: RecoveryTips;
+  pace: PaceProgress;
 }
 
 export interface RecoveryTip {
@@ -93,6 +122,9 @@ export interface RecoveryTips {
 const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const MIN_SESSION_KM = 2.5;
 const DEFAULT_PACE = 7; // min/km si no hay historial
+const DEFAULT_REST_HR = 60;
+const MAX_RUN_DAYS = 6; // siempre queda al menos un día de descanso
+const MAX_DOUBLES = 2; // días en doble por semana
 
 // --- Fechas ---
 const toISO = (d: Date) => {
@@ -259,10 +291,117 @@ function chooseDays(candidates: number[], k: number, ranBefore: Set<number>): nu
   return best.sort((a, b) => a - b);
 }
 
+// --- Ritmo en zona 2 ---
+// Cada trote con pulso se lleva al ritmo que habría tenido justo en maxHR,
+// usando la reserva de pulso (pulso medio − reposo): un trote a 9:00 con 152 ppm
+// equivale a algo más lento a 146, y uno a 9:30 con 140 ppm, a algo más rápido.
+// Solo se usan trotes cercanos al tope para no extrapolar de más.
+function equivalentPace(pace: number, avgHR: number, goal: PaceGoal, restHR: number) {
+  if (Math.abs(avgHR - goal.maxHR) > 20) return null;
+  const used = avgHR - restHR;
+  const reserve = goal.maxHR - restHR;
+  if (used <= 20 || reserve <= 20) return null;
+  return (pace * used) / reserve;
+}
+
+function analyzePace(
+  runs: { date: string; km: number; minutes: number; avgHR: number | null }[],
+  goal: PaceGoal,
+  restHR: number,
+  today: Date,
+): PaceProgress {
+  const samples = runs
+    .filter((r) => r.avgHR !== null && r.minutes > 0 && r.km >= 1.5)
+    .map((r) => {
+      const pace = r.minutes / r.km;
+      return {
+        date: r.date,
+        avgHR: r.avgHR as number,
+        eq: pace > 4 && pace < 15 ? equivalentPace(pace, r.avgHR as number, goal, restHR) : null,
+      };
+    })
+    .filter((s): s is { date: string; avgHR: number; eq: number } => s.eq !== null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const daysAgo = (iso: string) => (today.getTime() - parse(iso).getTime()) / 86400000;
+  const recent = samples.filter((s) => daysAgo(s.date) <= 42);
+  const current = recent.length ? median(recent.slice(-5).map((s) => s.eq)) : null;
+  const older = samples.filter((s) => daysAgo(s.date) > 42 && daysAgo(s.date) <= 84);
+  const start = older.length >= 2 ? median(older.slice(0, 5).map((s) => s.eq)) : null;
+
+  // Tendencia: regresión lineal de las últimas 8 semanas
+  let trendPerWeek: number | null = null;
+  const window = samples.filter((s) => daysAgo(s.date) <= 56);
+  if (window.length >= 4 && daysAgo(window[0].date) - daysAgo(window[window.length - 1].date) >= 14) {
+    const xs = window.map((s) => -daysAgo(s.date));
+    const ys = window.map((s) => s.eq);
+    const mx = mean(xs);
+    const my = mean(ys);
+    const cov = xs.reduce((sum, x, i) => sum + (x - mx) * (ys[i] - my), 0);
+    const varX = xs.reduce((sum, x) => sum + (x - mx) ** 2, 0);
+    if (varX > 0) trendPerWeek = (cov / varX) * 7 * 60;
+  }
+
+  const last10 = samples.slice(-10);
+  const inZoneShare = last10.length
+    ? last10.filter((s) => s.avgHR <= goal.maxHR).length / last10.length
+    : null;
+
+  const gapSecs = current !== null ? Math.round((current - goal.pace) * 60) : null;
+  const reached = gapSecs !== null && gapSecs <= 0;
+  const weeksToGoal =
+    gapSecs !== null && !reached && trendPerWeek !== null && trendPerWeek < -0.5
+      ? Math.ceil(gapSecs / -trendPerWeek)
+      : null;
+  const progressPct =
+    current !== null && start !== null && start > goal.pace
+      ? Math.max(0, Math.min(100, ((start - current) / (start - goal.pace)) * 100))
+      : reached
+        ? 100
+        : null;
+
+  let headline: string;
+  let detail: string;
+  if (current === null) {
+    headline = "Aún no hay trotes con pulso para medir tu ritmo";
+    detail = `Cuando sincronices trotes con pulso cercano a ${goal.maxHR} ppm, aquí verás cuánto te falta para ${formatPace(goal.pace)} min/km.`;
+  } else if (reached) {
+    headline = `Objetivo logrado: ${formatPace(current)} min/km a ${goal.maxHR} ppm`;
+    detail = "Ya rindes el ritmo objetivo en zona 2. Puedes mantener el volumen o ponerte una meta nueva en Preferencias.";
+  } else {
+    headline = `A ${goal.maxHR} ppm hoy rindes ~${formatPace(current)} min/km`;
+    const trendText =
+      trendPerWeek === null
+        ? "Con unas semanas más de datos se podrá estimar cuándo llegas."
+        : trendPerWeek < -0.5
+          ? `Mejoras ~${Math.round(-trendPerWeek)} s/km por semana: ${
+              (weeksToGoal as number) > 52 ? "a este paso, más de un año" : `unas ${weeksToGoal} semanas más`
+            }.`
+          : trendPerWeek > 2
+            ? "Las últimas semanas el ritmo a este pulso se ha puesto más lento: suele ser cansancio, calor o poco volumen."
+            : "Por ahora el ritmo está estable: lo que lo mueve es sumar semanas constantes de volumen suave.";
+    detail = `Te faltan ${gapSecs} s/km para ${formatPace(goal.pace)}. ${trendText}`;
+  }
+
+  return {
+    goal,
+    current,
+    start,
+    progressPct,
+    trendPerWeek,
+    weeksToGoal,
+    inZoneShare,
+    samples: samples.length,
+    reached,
+    headline,
+    detail,
+  };
+}
+
 export function buildWeekPlan(
   appRuns: AppRun[],
-  weeklyGoal: WeeklyGoalInput | null,
   intervals: IntervalsData | null,
+  goal: PaceGoal = DEFAULT_PACE_GOAL,
   now: Date = new Date(),
 ): WeekPlan {
   const today = new Date(now);
@@ -271,9 +410,21 @@ export function buildWeekPlan(
   const weekStart = startOfWeek(today);
   const todayIdx = Math.round((today.getTime() - weekStart.getTime()) / 86400000);
 
+  // Si un trote no tiene pulso en la app (ej. ingresado a mano), se toma el de Intervals.icu
+  const intervalsHR = (date: string, km: number) =>
+    intervals?.runs.find((r) => r.date === date && Math.abs(r.km - km) <= Math.max(0.3, km * 0.1))
+      ?.avgHR ?? null;
   const runs = appRuns
     .filter((r) => r.type !== "rucking" && Number(r.distance) > 0)
-    .map((r) => ({ date: r.date, km: Number(r.distance), minutes: r.duration }));
+    .map((r) => {
+      const km = Number(r.distance);
+      return {
+        date: r.date,
+        km,
+        minutes: r.duration,
+        avgHR: r.avg_bpm ? Number(r.avg_bpm) : intervalsHR(r.date, km),
+      };
+    });
 
   const kmOn = (iso: string) => runs.filter((r) => r.date === iso).reduce((s, r) => s + r.km, 0);
 
@@ -338,18 +489,19 @@ export function buildWeekPlan(
   const warn = signals.filter((s) => s.level === "warn").length;
   const fatigue: FatigueLevel = bad > 0 || warn >= 2 ? "alta" : warn === 1 ? "moderada" : "baja";
 
-  // --- Objetivo de la semana ---
-  const reasons: string[] = [];
-  const avgSessions = mean(weeks.slice(0, 3).map((w) => w.sessions).filter((s) => s > 0));
-  let targetSessions = weeklyGoal?.target_runs
-    ? weeklyGoal.target_runs
-    : hasHistory
-      ? Math.min(5, Math.max(3, Math.round(avgSessions)))
-      : 3;
+  // --- Ritmo en zona 2 vs objetivo ---
+  const restHR =
+    [...(intervals?.wellness ?? [])].reverse().find((w) => w.restingHR !== null)?.restingHR ??
+    DEFAULT_REST_HR;
+  const pace = analyzePace(runs, goal, restHR, today);
 
+  // --- Volumen de la semana ---
+  // Lo que más mejora el ritmo a un mismo pulso es acumular tiempo en zona 2:
+  // mientras no llegues al objetivo, el volumen sube de a poco cada semana.
+  const reasons: string[] = [];
   let targetKm: number;
   if (!hasHistory || baseKm < MIN_SESSION_KM) {
-    targetKm = targetSessions * 3;
+    targetKm = 9;
     reasons.push("Con poco historial reciente, la semana parte suave: trotes cortos de unos 3 km.");
   } else {
     const building = weeks[0].km > weeks[1].km && weeks[1].km > weeks[2].km;
@@ -363,24 +515,42 @@ export function buildWeekPlan(
     } else if (building) {
       factor = 0.85;
       reasons.push("Llevas 3 semanas subiendo volumen seguidas: esta semana toca descarga (~15% menos) para asimilar.");
+    } else if (pace.reached) {
+      factor = 1;
+      reasons.push("Ya rindes el ritmo objetivo: se mantiene el volumen para consolidarlo.");
     } else {
-      reasons.push("Vienes bien recuperado: se sube ~8% sobre tu volumen reciente, dentro de lo seguro.");
+      reasons.push(
+        `Vienes bien recuperado: se sube ~8% sobre tu volumen reciente. Más tiempo en zona 2 es lo que te acerca a ${formatPace(goal.pace)} min/km.`,
+      );
     }
     targetKm = baseKm * factor;
-
-    if (weeklyGoal?.target_distance) {
-      const goal = Number(weeklyGoal.target_distance);
-      if (goal < targetKm) {
-        targetKm = goal;
-        reasons.push(`Tu meta semanal es ${fmtKm(goal)} km, así que no hace falta pasarse de ahí.`);
-      } else if (goal > targetKm * 1.05) {
-        reasons.push(
-          `Tu meta es ${fmtKm(goal)} km; para no lesionarte se llega de a poco, semana a semana.`,
-        );
-      }
-    }
   }
   targetKm = Math.max(MIN_SESSION_KM, round05(targetKm));
+
+  // --- Cuántas sesiones y de qué largo ---
+  // Mejor varias salidas cortas que pocas largas: el pulso se mantiene bajo el
+  // tope y el cuerpo se recupera más fácil. El largo cómodo sale de tus trotes
+  // recientes; si el pulso se te dispara en las salidas largas, se acorta.
+  const avgRunKm = last4.length ? mean(last4.map((r) => r.km)) : 3;
+  const decouplings = (intervals?.runs ?? [])
+    .filter((r) => r.decoupling !== null && r.minutes >= 30)
+    .map((r) => r.decoupling as number);
+  const drift = decouplings.length >= 3 ? median(decouplings.slice(-6)) : null;
+  let typicalKm = Math.min(8, Math.max(3, avgRunKm));
+  if (drift !== null && drift > 5) {
+    typicalKm = Math.max(3, typicalKm * 0.85);
+    reasons.push(
+      `En tus salidas de más de 30 min el pulso deriva ~${Math.round(drift)}%: sesiones más cortas y frecuentes te ayudan a no pasar de ${goal.maxHR} ppm.`,
+    );
+  }
+  const maxDays = fatigue === "baja" ? MAX_RUN_DAYS : MAX_RUN_DAYS - 1;
+  const targetSessions = Math.min(maxDays, Math.max(3, Math.ceil(targetKm / typicalKm)));
+
+  if (pace.inZoneShare !== null && pace.inZoneShare < 0.6) {
+    reasons.push(
+      `Solo ${Math.round(pace.inZoneShare * 100)}% de tus últimos trotes terminó bajo ${goal.maxHR} ppm. Ir más lento (o caminar en las subidas) ahora es lo que te hará más rápido después.`,
+    );
+  }
 
   // --- Días disponibles y reparto ---
   const remainingKm = Math.max(0, targetKm - doneKm);
@@ -398,10 +568,9 @@ export function buildWeekPlan(
     candidates.push(i);
   }
 
-  // Nunca más de 2 de cada 3 días disponibles (evita 3 trotes seguidos)
   remainingSessions = Math.min(
     remainingSessions,
-    Math.ceil((candidates.length * 2) / 3),
+    maxDays - doneDays.size,
     Math.floor(remainingKm / MIN_SESSION_KM),
   );
   const chosen = chooseDays(candidates, remainingSessions, ranBefore);
@@ -424,13 +593,15 @@ export function buildWeekPlan(
     const otherKm = others.length
       ? Math.max(MIN_SESSION_KM, round05((remainingKm - longKm) / others.length))
       : 0;
-    // Un rodaje no debería ser mucho más largo que tu trote típico
-    const avgRunKm = last4.length ? mean(last4.map((r) => r.km)) : 3;
-    const easyCap = Math.max(MIN_SESSION_KM, round05(avgRunKm * 1.2));
+    // Un rodaje no debería ser mucho más largo que tu trote típico; si hace
+    // falta más volumen, ese día va en doble (dos sesiones cortas). Con deriva
+    // de pulso alta no se estira más allá de lo habitual.
+    const easyCap = Math.max(MIN_SESSION_KM, round05(typicalKm * (drift !== null && drift > 5 ? 1 : 1.2)));
+    let doublesLeft = fatigue !== "alta" && baseKm >= 12 ? MAX_DOUBLES : 0;
 
     for (const d of chosen) {
       let kind: SessionKind = d === longDay ? "long" : "easy";
-      let kmD = d === longDay ? longKm : Math.min(otherKm, easyCap);
+      let kmD = d === longDay ? longKm : Math.min(otherKm, doublesLeft > 0 ? easyCap * 2 : easyCap);
       if (kind === "easy" && longDay !== null && d === longDay + 1) {
         kind = "recovery";
         kmD = Math.max(MIN_SESSION_KM, round05(kmD * 0.75));
@@ -439,11 +610,28 @@ export function buildWeekPlan(
         kind = "recovery";
         kmD = Math.max(MIN_SESSION_KM, round05(kmD * 0.85));
       }
+      if (kind !== "easy") kmD = Math.min(kmD, kind === "long" ? longKm : easyCap);
+      const half = round05(kmD / 2);
+      const parts =
+        kind === "easy" && kmD > easyCap && half >= MIN_SESSION_KM ? [half, half] : undefined;
+      if (parts) {
+        kmD = half * 2;
+        doublesLeft--;
+      } else if (kind === "easy") {
+        kmD = Math.min(kmD, easyCap);
+      }
       sessions.set(d, {
         kind,
-        title: kind === "long" ? "Fondo suave" : kind === "recovery" ? "Trote de recuperación" : "Rodaje zona 2",
+        title: parts
+          ? "Doble zona 2"
+          : kind === "long"
+            ? "Fondo suave"
+            : kind === "recovery"
+              ? "Trote de recuperación"
+              : "Rodaje zona 2",
         km: kmD,
         minutes: round5(kmD * easyPace * (kind === "recovery" ? 1.03 : 1)),
+        parts,
       });
     }
   }
@@ -467,9 +655,14 @@ export function buildWeekPlan(
   if (kmOn(todayISO) > 0) {
     todayHeadline = `Hoy ya trotaste ${fmtKm(kmOn(todayISO))} km`;
     todayDetail = "Buen trabajo. Lo que queda de la semana está repartido abajo.";
+  } else if (todayPlan?.parts) {
+    todayHeadline = `Hoy: doble de ${todayPlan.parts.map(fmtKm).join(" + ")} km`;
+    todayDetail = `Dos trotes cortos (mañana y tarde, con al menos 4 horas entre ellos), unos ${round5(
+      todayPlan.minutes / 2,
+    )} minutos cada uno bajo ${goal.maxHR} ppm.`;
   } else if (todayPlan) {
     todayHeadline = `Hoy: ${todayPlan.title.toLowerCase()} de ${fmtKm(todayPlan.km)} km`;
-    todayDetail = `Unos ${todayPlan.minutes} minutos a ritmo cómodo.`;
+    todayDetail = `Unos ${todayPlan.minutes} minutos sin pasar de ${goal.maxHR} ppm; si sube, baja el ritmo o camina un poco.`;
   } else if (fatigue === "alta") {
     todayHeadline = "Hoy: descanso";
     todayDetail = "Tus señales piden recuperar. Caminar o movilidad suave está bien.";
@@ -493,21 +686,28 @@ export function buildWeekPlan(
   if (chosen.some((d, i) => i > 0 && chosen[i - 1] === d - 1)) {
     reasons.push("Algún trote cae en días seguidos: el segundo de ellos, bien suave.");
   }
+  if ([...sessions.values()].some((x) => x.parts)) {
+    reasons.push(
+      "Para sumar volumen sin alargar cada salida, algunos días van en doble: dos trotes cortos en el día suman el mismo tiempo en zona 2 con menos deriva de pulso y menos impacto.",
+    );
+  }
   if (doneDays.size >= targetSessions && remainingKm > 0) {
-    reasons.push("Ya completaste los trotes que te propusiste esta semana; el resto es opcional.");
+    reasons.push("Ya completaste los días de trote de esta semana; el resto es opcional.");
   }
 
   // --- Guía de intensidad ---
   const z2 = intervals?.zone2;
   const maxHR = intervals?.maxHR;
-  const hrGuide = z2
-    ? `Zona 2: ${z2.min}–${z2.max} ppm`
-    : maxHR
-      ? `Zona 2 aprox.: ${Math.round(maxHR * 0.6)}–${Math.round(maxHR * 0.7)} ppm`
-      : "Zona 2: ritmo en que puedes conversar";
-  const paceGuide = recentPaces.length
-    ? `Tu ritmo suave habitual: ${formatPace(easyPace)} min/km`
-    : "Sin ritmo de referencia aún";
+  const zoneFloor = z2 ? z2.min : maxHR ? Math.round(maxHR * 0.6) : null;
+  const hrGuide = zoneFloor
+    ? `Zona 2: ${zoneFloor}–${goal.maxHR} ppm`
+    : `Zona 2: bajo ${goal.maxHR} ppm`;
+  const paceGuide =
+    pace.current !== null
+      ? `Ritmo a ${goal.maxHR} ppm: ${formatPace(pace.current)} → meta ${formatPace(goal.pace)} min/km`
+      : recentPaces.length
+        ? `Tu ritmo suave habitual: ${formatPace(easyPace)} min/km`
+        : "Sin ritmo de referencia aún";
 
   const recovery = buildRecoveryTips({
     ranToday: kmOn(todayISO) > 0,
@@ -533,6 +733,7 @@ export function buildWeekPlan(
     hrGuide,
     paceGuide,
     usedIntervals: Boolean(intervals),
+    pace,
   };
 }
 

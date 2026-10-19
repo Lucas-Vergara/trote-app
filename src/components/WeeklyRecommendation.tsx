@@ -1,23 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import {
-  AppRun,
-  IntervalsData,
-  WeeklyGoalInput,
-  buildWeekPlan,
-} from "@/lib/weeklyRecommendation";
+import React from "react";
+import { WeekPlan } from "@/lib/weeklyRecommendation";
+import type { IntervalsState } from "@/lib/useIntervalsData";
+import PaceGoalCard from "./PaceGoalCard";
 import styles from "./WeeklyRecommendation.module.css";
 
 interface WeeklyRecommendationProps {
-  runs: AppRun[];
-  weeklyGoal: WeeklyGoalInput | null;
-  canUseIntervals: boolean;
+  plan: WeekPlan;
+  intervals: IntervalsState;
+  onEditGoal?: () => void;
 }
-
-type IntervalsState =
-  | { status: "loading" }
-  | { status: "ready"; data: IntervalsData }
-  | { status: "unavailable"; message: string | null };
 
 const fmtKm = (n: number) => n.toLocaleString("es-CL", { maximumFractionDigits: 1 });
 
@@ -28,51 +19,10 @@ const FATIGUE_LABEL = {
 } as const;
 
 export default function WeeklyRecommendation({
-  runs,
-  weeklyGoal,
-  canUseIntervals,
+  plan,
+  intervals,
+  onEditGoal,
 }: WeeklyRecommendationProps) {
-  const [intervals, setIntervals] = useState<IntervalsState>(
-    canUseIntervals ? { status: "loading" } : { status: "unavailable", message: null },
-  );
-
-  useEffect(() => {
-    if (!canUseIntervals) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session) throw new Error("Sin sesión");
-        const res = await fetch("/api/recommendations/intervals", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const body = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) {
-          setIntervals({
-            status: "unavailable",
-            message: res.status === 501 || res.status === 403 ? null : body.error || null,
-          });
-          return;
-        }
-        setIntervals({ status: "ready", data: body as IntervalsData });
-      } catch {
-        if (!cancelled) setIntervals({ status: "unavailable", message: "No se pudo conectar con Intervals.icu." });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [canUseIntervals]);
-
-  const plan = useMemo(
-    () => buildWeekPlan(runs, weeklyGoal, intervals.status === "ready" ? intervals.data : null),
-    [runs, weeklyGoal, intervals],
-  );
-
   if (intervals.status === "loading") {
     return (
       <div className={styles.container}>
@@ -100,13 +50,16 @@ export default function WeeklyRecommendation({
         </div>
       </div>
 
+      {/* OBJETIVO */}
+      <PaceGoalCard plan={plan} onEditGoal={onEditGoal} />
+
       {/* SEMANA */}
       <div className={`${styles.card} glass-panel`}>
         <div className={styles.cardHeader}>
           <h3 className={styles.cardTitle}>Tu semana</h3>
           <span className={styles.cardSubtitle}>
             {fmtKm(plan.doneKm)} de {fmtKm(plan.targetKm)} km · {plan.doneSessions} de{" "}
-            {plan.targetSessions} trotes
+            {plan.targetSessions} días de trote
           </span>
         </div>
         <div className={styles.progressTrack}>
@@ -136,7 +89,9 @@ export default function WeeklyRecommendation({
                         {d.session.title}
                       </span>
                       <span className={styles.sessionMeta}>
-                        {fmtKm(d.session.km)} km · ~{d.session.minutes} min
+                        {d.session.parts
+                          ? `${d.session.parts.map(fmtKm).join(" km + ")} km (mañana y tarde) · ~${d.session.minutes} min en total`
+                          : `${fmtKm(d.session.km)} km · ~${d.session.minutes} min`}
                       </span>
                     </>
                   ) : (
@@ -208,7 +163,10 @@ export default function WeeklyRecommendation({
           {plan.reasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
-          <li>Todo en zona 2: si el pulso sube, baja el ritmo o camina un poco. Construir base es ir suave.</li>
+          <li>
+            Todo bajo {plan.pace.goal.maxHR} ppm: si el pulso sube, baja el ritmo o camina un poco. El ritmo a
+            ese pulso mejora con semanas constantes de volumen suave, no apurando los trotes.
+          </li>
         </ul>
         {intervals.status === "unavailable" && (
           <p className={styles.muted}>
