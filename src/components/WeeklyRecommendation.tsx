@@ -168,6 +168,39 @@ export default function WeeklyRecommendation({
         </div>
       )}
 
+      {/* RECUPERACIÓN */}
+      <div className={`${styles.card} glass-panel`}>
+        <div className={styles.cardHeader}>
+          <h3 className={styles.cardTitle}>Recuperación de hoy</h3>
+          <span className={styles.cardSubtitle}>comida y descanso</span>
+        </div>
+        <div className={styles.recoveryGrid}>
+          {(
+            [
+              ["Qué comer", plan.recovery.food],
+              ["Cómo descansar", plan.recovery.rest],
+            ] as const
+          ).map(([heading, tips]) => (
+            <div key={heading} className={styles.recoveryColumn}>
+              <h4 className={styles.recoveryHeading}>{heading}</h4>
+              <ul className={styles.tipList}>
+                {tips.map((t) => (
+                  <li key={t.title} className={styles.tip}>
+                    <span className={styles.tipIcon} aria-hidden="true">
+                      {t.icon}
+                    </span>
+                    <div>
+                      <span className={styles.tipTitle}>{t.title}</span>
+                      <p className={styles.tipText}>{t.text}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* POR QUÉ */}
       <div className={`${styles.card} glass-panel`}>
         <h3 className={styles.cardTitle}>Por qué esta semana</h3>

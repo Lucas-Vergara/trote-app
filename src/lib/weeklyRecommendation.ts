@@ -76,6 +76,18 @@ export interface WeekPlan {
   hrGuide: string;
   paceGuide: string;
   usedIntervals: boolean;
+  recovery: RecoveryTips;
+}
+
+export interface RecoveryTip {
+  icon: string;
+  title: string;
+  text: string;
+}
+
+export interface RecoveryTips {
+  food: RecoveryTip[];
+  rest: RecoveryTip[];
 }
 
 const WEEKDAYS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -497,7 +509,16 @@ export function buildWeekPlan(
     ? `Tu ritmo suave habitual: ${formatPace(easyPace)} min/km`
     : "Sin ritmo de referencia aún";
 
+  const recovery = buildRecoveryTips({
+    ranToday: kmOn(todayISO) > 0,
+    todayKind: todayPlan?.kind ?? null,
+    tomorrowKind: sessions.get(todayIdx + 1)?.kind ?? null,
+    fatigue,
+    signals,
+  });
+
   return {
+    recovery,
     weekStart: toISO(weekStart),
     targetKm,
     targetSessions,
@@ -513,4 +534,107 @@ export function buildWeekPlan(
     paceGuide,
     usedIntervals: Boolean(intervals),
   };
+}
+
+// --- Recomendaciones de comida y descanso según el día ---
+function buildRecoveryTips({
+  ranToday,
+  todayKind,
+  tomorrowKind,
+  fatigue,
+  signals,
+}: {
+  ranToday: boolean;
+  todayKind: SessionKind | null;
+  tomorrowKind: SessionKind | null;
+  fatigue: FatigueLevel;
+  signals: Signal[];
+}): RecoveryTips {
+  const food: RecoveryTip[] = [];
+  const rest: RecoveryTip[] = [];
+  const level = (label: string) => signals.find((s) => s.label === label)?.level;
+  const runDay = ranToday || todayKind !== null;
+
+  // Comida
+  if (todayKind === "long") {
+    food.push({
+      icon: "🍌",
+      title: "Antes del fondo",
+      text: "Come algo liviano con carbohidratos 1–2 horas antes (pan con miel, plátano, avena). Nada pesado ni muy graso.",
+    });
+  } else if (todayKind) {
+    food.push({
+      icon: "🍞",
+      title: "Antes de trotar",
+      text: "Para un rodaje suave no necesitas comer especial; si tienes hambre, un snack chico (fruta o yogur) 1 hora antes basta.",
+    });
+  }
+  if (runDay) {
+    food.push({
+      icon: "🥚",
+      title: "Después de trotar",
+      text: "Dentro de la hora siguiente: proteína (20–30 g: huevos, yogur griego, pollo, legumbres o un batido) más carbohidratos para reponer energía.",
+    });
+  }
+  if (tomorrowKind === "long") {
+    food.push({
+      icon: "🍝",
+      title: "Mañana hay fondo",
+      text: "Que la cena de hoy tenga una buena porción de carbohidratos (arroz, papas, pasta) y cena temprano para dormir liviano.",
+    });
+  }
+  food.push({
+    icon: "💧",
+    title: "Hidratación",
+    text: runDay
+      ? "Toma agua durante el día y repón después del trote; si sudaste mucho o hace calor, suma algo de sal o una bebida con electrolitos."
+      : "Aunque descanses, mantén buena hidratación durante el día: la recuperación también pasa por ahí.",
+  });
+  if (fatigue !== "baja") {
+    food.push({
+      icon: "🥗",
+      title: "No comas de menos",
+      text: "Cuando vienes cargado, comer poco frena la recuperación. Asegura proteína en cada comida y verduras o fruta de colores.",
+    });
+  }
+
+  // Descanso
+  const sleepLevel = level("Sueño");
+  rest.push({
+    icon: "😴",
+    title: "Sueño",
+    text:
+      sleepLevel === "warn" || sleepLevel === "bad"
+        ? "Anoche dormiste poco: hoy prioriza acostarte más temprano. Si puedes, una siesta corta (20 min) ayuda."
+        : "Apunta a 7–9 horas con horario regular. Es donde más se recupera el cuerpo y se asimila el entrenamiento.",
+  });
+  if (level("HRV") === "warn" || level("HRV") === "bad" || level("Pulso en reposo") === "warn" || level("Pulso en reposo") === "bad") {
+    rest.push({
+      icon: "🫀",
+      title: "Tu cuerpo está en alerta",
+      text: "HRV baja o pulso en reposo alto suelen venir de estrés, mal sueño o un resfrío incubándose. Baja el ritmo, evita alcohol y cena liviano.",
+    });
+  }
+  if (!runDay) {
+    rest.push({
+      icon: "🚶",
+      title: "Descanso activo",
+      text: "Una caminata de 20–30 minutos o movilidad suave ayuda más que estar todo el día quieto.",
+    });
+  } else {
+    rest.push({
+      icon: "🧘",
+      title: "Después del trote",
+      text: "5–10 minutos de caminata suave y estiramientos o movilidad de cadera, gemelos y isquios.",
+    });
+  }
+  if (fatigue === "alta") {
+    rest.push({
+      icon: "🛑",
+      title: "Si algo duele",
+      text: "Molestia que aumenta al trotar o te cambia la pisada: descansa ese día. Si dura más de unos días, consulta.",
+    });
+  }
+
+  return { food, rest };
 }
