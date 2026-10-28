@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Registro de entrenamientos de trote, metas y evolución',
     start_url: '/',
     display: 'standalone',
-    background_color: '#09090b',
-    theme_color: '#09090b',
+    background_color: '#fafafc',
+    theme_color: '#fafafc',
     orientation: 'portrait-primary',
     icons: [
       {

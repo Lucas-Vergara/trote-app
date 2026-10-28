@@ -24,9 +24,6 @@
 .logoIcon {
   width: 28px;
   height: 28px;
-  color: var(--primary-neon);
-  filter: drop-shadow(0 0 4px rgba(2, 132, 199, 0.25));
-  animation: float 3s ease-in-out infinite;
 }
 
 .logoText {
@@ -71,11 +68,6 @@
 
 .statusTextDesktop {
   display: inline;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
 }
 
 /* Mobile responsive adjustments */

@@ -1,5 +1,6 @@
 import React from 'react';
 import styles from './Navbar.module.css';
+import Logo from './Logo';
 
 interface NavbarProps {
   isCloudSynced: boolean;
@@ -20,16 +21,7 @@ export default function Navbar({ isCloudSynced, userEmail, onLogout, onLoginClic
       <div className={styles.container}>
         {/* LOGO */}
         <div className={styles.logoContainer}>
-          <svg className={styles.logoIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8h.01" />
-            <path d="M17 22v-3a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v3" />
-            <path d="M2 10h20" />
-            <path d="M12 2v8" />
-            <path d="M12 14v8" />
-            <path d="M20 14h2" />
-            <path d="M2 14h2" />
-            <path d="M6 6h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z" />
-          </svg>
+          <Logo className={styles.logoIcon} />
           <span className={styles.logoText}>Trote<span className="text-gradient">App</span></span>
         </div>
 

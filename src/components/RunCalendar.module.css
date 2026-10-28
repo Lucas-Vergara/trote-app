@@ -176,6 +176,110 @@
   white-space: nowrap;
 }
 
+/* Marca de varias sesiones en un día */
+.countBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: var(--primary-neon);
+  background: rgba(var(--primary-neon-rgb), 0.12);
+  font-variant-numeric: tabular-nums;
+}
+
+.ruckingActiveCell .countBadge {
+  color: var(--secondary-neon);
+  background: rgba(var(--secondary-neon-rgb), 0.12);
+}
+
+.pickedCell {
+  border-color: var(--primary-neon);
+}
+
+/* Selector de sesiones del día */
+.dayPicker {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dayPickerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px 4px;
+}
+
+.dayPickerTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg-light);
+  text-transform: capitalize;
+}
+
+.dayPickerClose {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.sessionRow,
+.addSession {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg-light);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sessionRow:hover,
+.addSession:hover {
+  background: rgba(var(--primary-neon-rgb), 0.08);
+}
+
+.sessionMain {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sessionMeta {
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.sessionAction {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--primary-neon);
+  font-weight: 600;
+}
+
+.addSession {
+  color: var(--primary-neon);
+  font-weight: 600;
+}
+
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
@@ -207,6 +311,13 @@
   .runKm, .ruckingKm {
     font-size: 10px;
     font-weight: 800;
+  }
+
+  .countBadge {
+    top: 4px;
+    right: 4px;
+    font-size: 9px;
+    padding: 1px 4px;
   }
 }
 

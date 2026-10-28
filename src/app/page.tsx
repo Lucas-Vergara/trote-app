@@ -17,6 +17,7 @@ import { User } from "@supabase/supabase-js";
 // import { TRAINING_PLAN_10K } from "@/lib/planData";
 import { usePreferences } from "@/lib/preferences";
 import { useIntervalsData } from "@/lib/useIntervalsData";
+import { useTabHistory } from "@/lib/useTabHistory";
 import { buildWeekPlan } from "@/lib/weeklyRecommendation";
 import styles from "./page.module.css";
 
@@ -33,6 +34,8 @@ interface Run {
   rucking_weight?: number | null;
 }
 
+const TABS = ["progress", "evolution", "week"] as const;
+
 export default function Home() {
   const [runs, setRuns] = useState<Run[]>([]);
 
@@ -44,9 +47,7 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
 
   // Navigation State
-  const [activeTab, setActiveTab] = useState<"progress" | "evolution" | "week">(
-    "progress",
-  );
+  const [activeTab, setActiveTab] = useTabHistory(TABS, "progress");
 
   // Preferences (rucking hidden by default)
   const [preferences, updatePreferences] = usePreferences();

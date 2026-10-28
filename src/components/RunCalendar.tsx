@@ -28,6 +28,8 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
   const now = new Date();
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  // Día con varias sesiones cuyo selector está abierto
+  const [pickerDate, setPickerDate] = useState<string | null>(null);
 
   const getDaysInMonth = (year: number, month: number) => {
     return new Date(year, month + 1, 0).getDate();
@@ -44,6 +46,7 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
   const firstDayIndex = getFirstDayOfMonth(currentYear, currentMonth);
 
   const prevMonth = () => {
+    setPickerDate(null);
     if (currentMonth === 0) {
       setCurrentMonth(11);
       setCurrentYear(currentYear - 1);
@@ -53,6 +56,7 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
   };
 
   const nextMonth = () => {
+    setPickerDate(null);
     if (currentMonth === 11) {
       setCurrentMonth(0);
       setCurrentYear(currentYear + 1);
@@ -80,10 +84,26 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
   const handleCellClick = (cell: { dayNumber: number | null; dateStr: string }) => {
     if (!cell.dayNumber) return;
     
-    // Find if there's an existing run on this day
-    const existingRun = runs.find(run => run.date === cell.dateStr);
-    onSelectDate(cell.dateStr, existingRun);
+    const dayRuns = runs.filter(run => run.date === cell.dateStr);
+    if (dayRuns.length > 1) {
+      // Con varias sesiones, se elige cuál abrir
+      setPickerDate(pickerDate === cell.dateStr ? null : cell.dateStr);
+      return;
+    }
+    setPickerDate(null);
+    onSelectDate(cell.dateStr, dayRuns[0]);
   };
+
+  const formatKm = (distance: number | null | undefined) =>
+    `${distance !== null && distance !== undefined ? parseFloat(Number(distance).toFixed(1)) : 0} km`;
+
+  const formatRuck = (run: Run) =>
+    run.rucking_weight !== null && run.rucking_weight !== undefined ? `${run.rucking_weight} kg` : 'Ruck';
+
+  const pickerRuns = pickerDate ? runs.filter(run => run.date === pickerDate) : [];
+  const pickerLabel = pickerDate
+    ? new Date(`${pickerDate}T12:00:00`).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })
+    : '';
 
   const isToday = (dayNumber: number | null) => {
     if (!dayNumber) return false;
@@ -131,28 +151,32 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
       {/* GRID DE DÍAS */}
       <div className={styles.daysGrid}>
         {calendarCells.map((cell, index) => {
-          // Find run for this cell
-          const dayRun = cell.dayNumber ? runs.find(run => run.date === cell.dateStr) : null;
+          const dayRuns = cell.dayNumber ? runs.filter(run => run.date === cell.dateStr) : [];
+          const dayRun = dayRuns[0];
           const today = isToday(cell.dayNumber);
 
-          const isRucking = dayRun?.type === 'rucking';
+          // Si hubo trote ese día manda el trote; el rucking solo cuando es lo único
+          const trotes = dayRuns.filter(run => run.type !== 'rucking');
+          const isRucking = dayRuns.length > 0 && trotes.length === 0;
+          const totalKm = trotes.reduce((sum, run) => sum + Number(run.distance ?? 0), 0);
 
           return (
             <div
               key={index}
-              className={`${styles.dayCell} ${!cell.dayNumber ? styles.emptyCell : ''} ${today ? styles.todayCell : ''} ${dayRun ? (isRucking ? styles.ruckingActiveCell : styles.runActiveCell) : ''}`}
+              className={`${styles.dayCell} ${!cell.dayNumber ? styles.emptyCell : ''} ${today ? styles.todayCell : ''} ${dayRun ? (isRucking ? styles.ruckingActiveCell : styles.runActiveCell) : ''} ${pickerDate === cell.dateStr ? styles.pickedCell : ''}`}
               onClick={() => handleCellClick(cell)}
             >
               {cell.dayNumber && (
                 <>
                   <span className={styles.dayNumber}>{cell.dayNumber}</span>
+                  {dayRuns.length > 1 && (
+                    <span className={styles.countBadge} aria-label={`${dayRuns.length} sesiones`}>×{dayRuns.length}</span>
+                  )}
                   {dayRun && <span className={styles.dayEmoji}>{isRucking ? '🎒' : '🏃'}</span>}
                   {dayRun && (
                     <div className={styles.runInfo}>
                       <span className={isRucking ? styles.ruckingKm : styles.runKm}>
-                        {isRucking 
-                          ? (dayRun.rucking_weight !== null && dayRun.rucking_weight !== undefined ? `${dayRun.rucking_weight} kg` : 'Ruck')
-                          : `${dayRun.distance !== null && dayRun.distance !== undefined ? parseFloat(Number(dayRun.distance).toFixed(1)) : 0} km`}
+                        {isRucking ? formatRuck(dayRun) : formatKm(totalKm)}
                       </span>
                     </div>
                   )}
@@ -162,6 +186,25 @@ export default function RunCalendar({ runs, onSelectDate, onQuickLog }: RunCalen
           );
         })}
       </div>
+
+      {/* SESIONES DEL DÍA (cuando hay más de una) */}
+      {pickerRuns.length > 1 && pickerDate && (
+        <div className={styles.dayPicker}>
+          <div className={styles.dayPickerHeader}>
+            <span className={styles.dayPickerTitle}>{pickerLabel}</span>
+            <button className={styles.dayPickerClose} onClick={() => setPickerDate(null)} aria-label="Cerrar sesiones del día">×</button>
+          </div>
+          {pickerRuns.map((run, i) => (
+            <button key={run.id ?? i} className={styles.sessionRow} onClick={() => onSelectDate(pickerDate, run)}>
+              <span>{run.type === 'rucking' ? '🎒' : '🏃'}</span>
+              <span className={styles.sessionMain}>{run.type === 'rucking' ? formatRuck(run) : formatKm(run.distance)}</span>
+              <span className={styles.sessionMeta}>{run.duration} min</span>
+              <span className={styles.sessionAction}>Editar</span>
+            </button>
+          ))}
+          <button className={styles.addSession} onClick={() => onSelectDate(pickerDate)}>+ Agregar otra sesión</button>
+        </div>
+      )}
     </div>
   );
 }
