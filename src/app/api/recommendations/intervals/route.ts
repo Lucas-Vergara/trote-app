@@ -42,8 +42,19 @@ interface SportSettings {
 const jsonError = (status: number, error: string) =>
   Response.json({ error }, { status });
 
-const isoDaysAgo = (days: number) =>
-  new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+const DAY_MS = 24 * 60 * 60 * 1000;
+const shiftISO = (iso: string, days: number) =>
+  new Date(Date.parse(iso + "T00:00:00Z") + days * DAY_MS).toISOString().split("T")[0];
+
+// La fecha de "hoy" la manda el cliente en su hora local: el servidor corre en
+// UTC y en Chile, desde las 21:00, UTC ya es mañana (y se colaban datos
+// proyectados del día siguiente). Solo se acepta si está a ±1 día del servidor.
+function localToday(value: unknown): string {
+  const server = new Date().toISOString().split("T")[0];
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return server;
+  const diff = Math.abs(Date.parse(value + "T00:00:00Z") - Date.parse(server + "T00:00:00Z"));
+  return diff <= DAY_MS ? value : server;
+}
 
 const num = (v: unknown) =>
   typeof v === "number" && isFinite(v) ? v : null;
@@ -89,16 +100,17 @@ export async function POST(request: Request) {
     }
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const body = (await request.json().catch(() => ({}))) as { today?: unknown };
+  const today = localToday(body.today);
   const activityFields =
     "id,start_date_local,type,distance,moving_time,average_heartrate,icu_training_load,decoupling";
 
   const [wellness, activities, athlete] = await Promise.all([
     get<IntervalsWellness[]>(
-      `${base}/wellness?oldest=${isoDaysAgo(WELLNESS_DAYS)}&newest=${today}`,
+      `${base}/wellness?oldest=${shiftISO(today, -WELLNESS_DAYS)}&newest=${today}`,
     ),
     get<IntervalsActivity[]>(
-      `${base}/activities?oldest=${isoDaysAgo(ACTIVITY_DAYS)}&fields=${activityFields}`,
+      `${base}/activities?oldest=${shiftISO(today, -ACTIVITY_DAYS)}&fields=${activityFields}`,
     ),
     get<{ sportSettings?: SportSettings[] }>(base),
   ]);
@@ -116,6 +128,7 @@ export async function POST(request: Request) {
 
   return Response.json({
     wellness: (wellness || [])
+      .filter((w) => w.id <= today) // nunca días futuros
       .map((w) => ({
         date: w.id,
         ctl: num(w.ctl),
