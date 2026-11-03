@@ -212,7 +212,8 @@ function wellnessSignals(wellness: WellnessDay[], asOf: string, loadBefore = fal
     return row && daysBetween(row.date, asOf) <= 1 ? row : undefined;
   };
 
-  // Forma = fitness (CTL) − fatiga (ATL), como % del fitness (escala de Intervals.icu)
+  // Forma = fitness (CTL) − fatiga (ATL), en la escala absoluta de Intervals.icu:
+  // entre −10 y −30 es carga productiva; bajo −30, riesgo alto.
   const load = [...rows]
     .reverse()
     .find((w) => w.ctl !== null && w.atl !== null && (!loadBefore || w.date < asOf));
@@ -220,23 +221,22 @@ function wellnessSignals(wellness: WellnessDay[], asOf: string, loadBefore = fal
     const ctl = load.ctl as number;
     const atl = load.atl as number;
     const tsb = ctl - atl;
-    const pct = ctl > 0 ? (tsb / ctl) * 100 : 0;
-    const level: SignalLevel = pct < -50 ? "bad" : pct < -30 ? "warn" : "ok";
+    const level: SignalLevel = tsb < -40 ? "bad" : tsb < -30 ? "warn" : "ok";
     signals.push({
       label: "Forma",
-      value: `${tsb > 0 ? "+" : ""}${Math.round(tsb)} (${pct > 0 ? "+" : ""}${Math.round(pct)}%)`,
+      value: `${tsb > 0 ? "+" : ""}${Math.round(tsb)}`,
       level,
       group: "carga",
       hint:
-        pct < -50
+        tsb < -40
           ? "Fatiga acumulada alta"
-          : pct < -30
+          : tsb < -30
             ? "Bastante cargado"
-            : pct < -10
+            : tsb < -10
               ? "Carga productiva"
-              : pct <= 5
+              : tsb <= 5
                 ? "Zona gris: mantienes"
-                : pct <= 20
+                : tsb <= 25
                   ? "Fresco"
                   : "Muy fresco: puedes cargar más",
     });
