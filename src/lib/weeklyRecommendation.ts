@@ -86,6 +86,7 @@ export interface Signal {
   value: string;
   level: SignalLevel;
   hint: string;
+  group?: "carga" | "recuperacion"; // sin grupo: solo informativa
 }
 
 export interface PlannedSession {
@@ -111,7 +112,9 @@ export interface WeekPlan {
   targetSessions: number;
   doneKm: number;
   doneSessions: number;
-  fatigue: FatigueLevel;
+  fatigue: FatigueLevel; // estado de hoy
+  weekFatigue: FatigueLevel; // estado con que se fijó la meta de la semana
+  weekReview: "lunes" | "jueves"; // cuándo se fijó (o revisó) la meta
   todayHeadline: string;
   todayDetail: string;
   days: PlanDay[];
@@ -185,92 +188,165 @@ export const formatPace = (minPerKm: number) => {
 };
 const fmtKm = (n: number) => n.toLocaleString("es-CL", { maximumFractionDigits: 1 });
 
-// --- Señales de cansancio desde Intervals.icu ---
-function wellnessSignals(wellness: WellnessDay[]): Signal[] {
-  const signals: Signal[] = [];
-  const latest = <K extends keyof WellnessDay>(key: K) =>
-    [...wellness].reverse().find((w) => w[key] !== null);
+// --- Señales de cansancio ---
+// Se agrupan en dos: "carga" (cuánto has entrenado: forma, subida de carga,
+// km de los últimos 7 días, días seguidos), que miden casi lo mismo y por eso
+// cuentan como una sola, y "recuperación" (HRV, pulso en reposo, sueño), que
+// dicen cómo respondió el cuerpo y cuentan cada una por separado.
+const daysBetween = (a: string, b: string) =>
+  Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000);
+const sd = (xs: number[]) => {
+  const m = mean(xs);
+  return Math.sqrt(mean(xs.map((x) => (x - m) ** 2)));
+};
 
-  // Forma = fitness (CTL) − fatiga (ATL)
-  const load = [...wellness].reverse().find((w) => w.ctl !== null && w.atl !== null);
+// Señales de Intervals.icu tal como se veían el día `asOf` (YYYY-MM-DD).
+// Con `loadBefore`, la forma se toma del día anterior (estado al despertar),
+// para que un trote ese mismo día no la cambie.
+function wellnessSignals(wellness: WellnessDay[], asOf: string, loadBefore = false): Signal[] {
+  const signals: Signal[] = [];
+  const rows = wellness.filter((w) => w.date <= asOf); // nunca filas futuras
+  // Solo valores de hoy o ayer: si el reloj no ha sincronizado, no se usa uno viejo
+  const fresh = <K extends keyof WellnessDay>(key: K) => {
+    const row = [...rows].reverse().find((w) => w[key] !== null);
+    return row && daysBetween(row.date, asOf) <= 1 ? row : undefined;
+  };
+
+  // Forma = fitness (CTL) − fatiga (ATL), como % del fitness (escala de Intervals.icu)
+  const load = [...rows]
+    .reverse()
+    .find((w) => w.ctl !== null && w.atl !== null && (!loadBefore || w.date < asOf));
   if (load) {
-    const tsb = (load.ctl as number) - (load.atl as number);
-    const level: SignalLevel = tsb < -30 ? "bad" : tsb < -20 ? "warn" : "ok";
+    const ctl = load.ctl as number;
+    const atl = load.atl as number;
+    const tsb = ctl - atl;
+    const pct = ctl > 0 ? (tsb / ctl) * 100 : 0;
+    const level: SignalLevel = pct < -50 ? "bad" : pct < -30 ? "warn" : "ok";
     signals.push({
       label: "Forma",
-      value: `${tsb > 0 ? "+" : ""}${Math.round(tsb)}`,
+      value: `${tsb > 0 ? "+" : ""}${Math.round(tsb)} (${pct > 0 ? "+" : ""}${Math.round(pct)}%)`,
       level,
+      group: "carga",
       hint:
-        level === "bad"
+        pct < -50
           ? "Fatiga acumulada alta"
-          : level === "warn"
+          : pct < -30
             ? "Bastante cargado"
-            : tsb > 5
-              ? "Fresco"
-              : "Carga productiva",
+            : pct < -10
+              ? "Carga productiva"
+              : pct <= 5
+                ? "Zona gris: mantienes"
+                : pct <= 20
+                  ? "Fresco"
+                  : "Muy fresco: puedes cargar más",
     });
     signals.push({
       label: "Fitness / Fatiga",
-      value: `${Math.round(load.ctl as number)} / ${Math.round(load.atl as number)}`,
+      value: `${Math.round(ctl)} / ${Math.round(atl)}`,
       level: "info",
       hint: "CTL (42 días) / ATL (7 días)",
     });
-  }
-
-  const ramp = latest("rampRate");
-  if (ramp && (ramp.rampRate as number) > 6) {
-    signals.push({
-      label: "Subida de carga",
-      value: `+${Math.round(ramp.rampRate as number)}/sem`,
-      level: "warn",
-      hint: "El fitness está subiendo rápido",
-    });
-  }
-
-  // HRV: último valor vs promedio de los 7 anteriores
-  const hrvDays = wellness.filter((w) => w.hrv !== null);
-  if (hrvDays.length >= 4) {
-    const last = hrvDays[hrvDays.length - 1].hrv as number;
-    const prev = mean(hrvDays.slice(-8, -1).map((w) => w.hrv as number));
-    const ratio = prev > 0 ? last / prev : 1;
-    signals.push({
-      label: "HRV",
-      value: `${Math.round(last)} ms`,
-      level: ratio < 0.85 ? "bad" : ratio < 0.92 ? "warn" : "ok",
-      hint: `${ratio >= 1 ? "+" : ""}${Math.round((ratio - 1) * 100)}% vs tu semana`,
-    });
-  }
-
-  // Pulso en reposo: último vs promedio de 28 días
-  const rhrDays = wellness.filter((w) => w.restingHR !== null);
-  if (rhrDays.length >= 4) {
-    const last = rhrDays[rhrDays.length - 1].restingHR as number;
-    const prev = mean(rhrDays.slice(-29, -1).map((w) => w.restingHR as number));
-    const diff = last - prev;
-    signals.push({
-      label: "Pulso en reposo",
-      value: `${Math.round(last)} ppm`,
-      level: diff >= 8 ? "bad" : diff >= 5 ? "warn" : "ok",
-      hint: `${diff >= 0 ? "+" : ""}${Math.round(diff)} vs tu promedio`,
-    });
-  }
-
-  // Sueño de la última noche registrada (solo si es de hoy o ayer)
-  const sleep = latest("sleepHours");
-  if (sleep) {
-    const age = (Date.now() - parse(sleep.date).getTime()) / 86400000;
-    if (age < 2) {
-      const h = sleep.sleepHours as number;
+    if (load.rampRate !== null && load.rampRate > 6) {
       signals.push({
-        label: "Sueño",
-        value: `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`,
-        level: h < 5.5 ? "bad" : h < 6.5 ? "warn" : "ok",
-        hint: h < 6.5 ? "Dormiste poco" : "Descanso suficiente",
+        label: "Subida de carga",
+        value: `+${Math.round(load.rampRate)}/sem`,
+        level: "warn",
+        group: "carga",
+        hint: "El fitness está subiendo rápido",
       });
     }
   }
 
+  // HRV (variabilidad del pulso): el valor del día y el promedio de 7 días,
+  // comparados con tu rango normal de las 4 semanas anteriores. Se trabaja en
+  // logaritmo porque la HRV varía en proporción, no en ms fijos. Un solo día
+  // bajo es aviso; bajo varios días seguidos (o muy bajo) es alerta.
+  const hrv = fresh("hrv");
+  if (hrv) {
+    const ln = (w: WellnessDay) => Math.log(w.hrv as number);
+    const withHrv = rows.filter((w) => w.hrv !== null && (w.hrv as number) > 0);
+    const base = withHrv.filter((w) => {
+      const age = daysBetween(w.date, hrv.date);
+      return age >= 1 && age <= 28;
+    });
+    if (base.length >= 7) {
+      const m = mean(base.map(ln));
+      const s = Math.max(sd(base.map(ln)), 0.05);
+      const z = (ln(hrv) - m) / s;
+      const week = withHrv.filter((w) => {
+        const age = daysBetween(w.date, hrv.date);
+        return age >= 0 && age < 7;
+      });
+      const weekZ = week.length >= 3 ? (mean(week.map(ln)) - m) / s : 0;
+      const level: SignalLevel =
+        z < -2 || (z < -1 && weekZ < -0.5) ? "bad" : z < -1 || weekZ < -0.5 ? "warn" : "ok";
+      const diffPct = Math.round((Math.exp(ln(hrv) - m) - 1) * 100);
+      signals.push({
+        label: "HRV",
+        value: `${Math.round(hrv.hrv as number)} ms`,
+        level,
+        group: "recuperacion",
+        hint:
+          level === "bad" && weekZ < -0.5
+            ? `${diffPct}% vs tu normal, y baja varios días`
+            : level === "ok"
+              ? `${diffPct >= 0 ? "+" : ""}${diffPct}% vs tu normal`
+              : `${diffPct}% vs tu normal (4 semanas)`,
+      });
+    }
+  }
+
+  // Pulso en reposo: el del día vs promedio de las 4 semanas anteriores
+  const rhr = fresh("restingHR");
+  if (rhr) {
+    const base = rows.filter((w) => {
+      const age = daysBetween(w.date, rhr.date);
+      return w.restingHR !== null && age >= 1 && age <= 28;
+    });
+    if (base.length >= 4) {
+      const last = rhr.restingHR as number;
+      const diff = last - mean(base.map((w) => w.restingHR as number));
+      signals.push({
+        label: "Pulso en reposo",
+        value: `${Math.round(last)} ppm`,
+        level: diff >= 8 ? "bad" : diff >= 5 ? "warn" : "ok",
+        group: "recuperacion",
+        hint: `${diff >= 0 ? "+" : ""}${Math.round(diff)} vs tu promedio`,
+      });
+    }
+  }
+
+  // Sueño de la última noche (solo si es de hoy o ayer)
+  const sleep = fresh("sleepHours");
+  if (sleep) {
+    const h = sleep.sleepHours as number;
+    signals.push({
+      label: "Sueño",
+      value: `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`,
+      level: h < 5.5 ? "bad" : h < 6.5 ? "warn" : "ok",
+      group: "recuperacion",
+      hint: h < 6.5 ? "Dormiste poco" : "Descanso suficiente",
+    });
+  }
+
   return signals;
+}
+
+// Cansado: alguna señal en rojo, o carga en amarillo + una de recuperación en
+// amarillo, o dos de recuperación en amarillo. Algo cargado: cualquier amarillo.
+function fatigueFrom(signals: Signal[]): FatigueLevel {
+  const rank = { ok: 0, info: 0, warn: 1, bad: 2 } as const;
+  const loadLevel = Math.max(
+    0,
+    ...signals.filter((s) => s.group === "carga").map((s) => rank[s.level]),
+  );
+  const recovery = signals.filter((s) => s.group === "recuperacion").map((s) => rank[s.level]);
+  const recBad = recovery.filter((l) => l === 2).length;
+  const recWarn = recovery.filter((l) => l === 1).length;
+  if (loadLevel === 2 || recBad > 0) return "alta";
+  if ((loadLevel === 1 && recWarn >= 1) || recWarn >= 2) return "alta";
+  if (loadLevel === 1 || recWarn === 1) return "moderada";
+  return "baja";
 }
 
 // --- Elección de días: repartir sin días seguidos cuando se pueda ---
@@ -487,40 +563,79 @@ export function buildWeekPlan(
   const doneDays = new Set(thisWeek.map((r) => r.date));
 
   // --- Señales de cansancio ---
-  const signals: Signal[] = intervals ? wellnessSignals(intervals.wellness) : [];
-
-  let streak = 0;
-  for (let d = addDays(today, kmOn(todayISO) > 0 ? 0 : -1); kmOn(toISO(d)) > 0; d = addDays(d, -1)) streak++;
-  if (streak >= 2) {
-    signals.push({
-      label: "Días seguidos",
-      value: `${streak}`,
-      level: streak >= 3 ? "warn" : "ok",
-      hint: streak >= 3 ? "Toca un día de descanso" : "Ojo con encadenar más",
-    });
-  }
-
-  const last7 = runs
-    .filter((r) => parse(r.date) > addDays(today, -7))
-    .reduce((s, r) => s + r.km, 0);
+  // `checkpoint`: el estado al despertar ese día (sin lo que se trotó ese día),
+  // para que la meta de la semana no cambie según la hora en que mires.
   const chronic = mean(weeks.map((w) => w.km));
-  if (chronic > 0) {
-    const ratio = last7 / chronic;
-    signals.push({
-      label: "Últimos 7 días",
-      value: `${fmtKm(last7)} km`,
-      level: ratio > 1.5 ? "bad" : ratio > 1.3 ? "warn" : "ok",
-      hint: `${Math.round(ratio * 100)}% de tu promedio semanal`,
-    });
-  }
+  const streakAt = (day: Date, includeDay: boolean) => {
+    let n = 0;
+    for (
+      let d = addDays(day, includeDay && kmOn(toISO(day)) > 0 ? 0 : -1);
+      kmOn(toISO(d)) > 0;
+      d = addDays(d, -1)
+    )
+      n++;
+    return n;
+  };
+  const signalsAt = (day: Date, checkpoint: boolean): Signal[] => {
+    const out = intervals ? wellnessSignals(intervals.wellness, toISO(day), checkpoint) : [];
 
-  const bad = signals.filter((s) => s.level === "bad").length;
-  const warn = signals.filter((s) => s.level === "warn").length;
-  const fatigue: FatigueLevel = bad > 0 || warn >= 2 ? "alta" : warn === 1 ? "moderada" : "baja";
+    const streak = streakAt(day, !checkpoint);
+    if (streak >= 2) {
+      out.push({
+        label: "Días seguidos",
+        value: `${streak}`,
+        level: streak >= 3 ? "warn" : "ok",
+        group: "carga",
+        hint: streak >= 3 ? "Toca un día de descanso" : "Ojo con encadenar más",
+      });
+    }
+
+    const from = addDays(day, checkpoint ? -7 : -6);
+    const last7 = runs
+      .filter((r) => {
+        const d = parse(r.date);
+        return d >= from && (checkpoint ? d < day : d <= day);
+      })
+      .reduce((s, r) => s + r.km, 0);
+    if (chronic > 0) {
+      const ratio = last7 / chronic;
+      out.push({
+        label: "Últimos 7 días",
+        value: `${fmtKm(last7)} km`,
+        level: ratio > 1.5 ? "bad" : ratio > 1.3 ? "warn" : "ok",
+        group: "carga",
+        hint: `${Math.round(ratio * 100)}% de tu promedio semanal`,
+      });
+    }
+    return out;
+  };
+
+  // Hoy: decide si hoy toca trotar, descansar o ir más suave
+  const signals = signalsAt(today, false);
+  const fatigue = fatigueFrom(signals);
+  const streak = streakAt(today, true);
+
+  // La semana: la meta se fija con el estado del lunes y se revisa el jueves
+  // con lo que mostraron lunes a jueves (2+ días cansado: baja; los 4 días
+  // recuperado: sube; si no, se mantiene).
+  let weekFatigue = fatigueFrom(signalsAt(weekStart, true));
+  let weekReview: WeekPlan["weekReview"] = "lunes";
+  if (todayIdx >= 3) {
+    const daily = [0, 1, 2, 3].map((i) => fatigueFrom(signalsAt(addDays(weekStart, i), true)));
+    weekFatigue =
+      daily.filter((f) => f === "alta").length >= 2
+        ? "alta"
+        : daily.every((f) => f === "baja")
+          ? "baja"
+          : "moderada";
+    weekReview = "jueves";
+  }
 
   // --- Ritmo en zona 2 vs objetivo ---
   const restHR =
-    [...(intervals?.wellness ?? [])].reverse().find((w) => w.restingHR !== null)?.restingHR ??
+    [...(intervals?.wellness ?? [])]
+      .reverse()
+      .find((w) => w.restingHR !== null && w.date <= todayISO)?.restingHR ??
     DEFAULT_REST_HR;
   const pace = analyzePace(runs, goal, restHR, today);
 
@@ -535,12 +650,16 @@ export function buildWeekPlan(
   } else {
     const building = weeks[0].km > weeks[1].km && weeks[1].km > weeks[2].km;
     let factor = 1.08;
-    if (fatigue === "alta") {
+    const when =
+      weekReview === "lunes"
+        ? "Al empezar la semana"
+        : "En la revisión del jueves (lunes a jueves)";
+    if (weekFatigue === "alta") {
       factor = 0.8;
-      reasons.push("Tus señales de cansancio están altas, así que la semana baja ~20% de volumen.");
-    } else if (fatigue === "moderada") {
+      reasons.push(`${when} tus señales de cansancio estaban altas, así que la semana baja ~20% de volumen.`);
+    } else if (weekFatigue === "moderada") {
       factor = 1;
-      reasons.push("Hay una señal de cansancio, así que se mantiene el volumen en vez de subirlo.");
+      reasons.push(`${when} había alguna señal de cansancio, así que se mantiene el volumen en vez de subirlo.`);
     } else if (building) {
       factor = 0.85;
       reasons.push("Llevas 3 semanas subiendo volumen seguidas: esta semana toca descarga (~15% menos) para asimilar.");
@@ -549,7 +668,7 @@ export function buildWeekPlan(
       reasons.push("Ya rindes el ritmo objetivo: se mantiene el volumen para consolidarlo.");
     } else {
       reasons.push(
-        `Vienes bien recuperado: se sube ~8% sobre tu volumen reciente. Más tiempo en zona 2 es lo que te acerca a ${formatPace(goal.pace)} min/km.`,
+        `${when} venías bien recuperado: se sube ~8% sobre tu volumen reciente. Más tiempo en zona 2 es lo que te acerca a ${formatPace(goal.pace)} min/km.`,
       );
     }
     targetKm = baseKm * factor;
@@ -572,7 +691,7 @@ export function buildWeekPlan(
       `En tus salidas de más de 30 min el pulso deriva ~${Math.round(drift)}%: sesiones más cortas y frecuentes te ayudan a no pasar de ${goal.maxHR} ppm.`,
     );
   }
-  const maxDays = fatigue === "baja" ? MAX_RUN_DAYS : MAX_RUN_DAYS - 1;
+  const maxDays = weekFatigue === "baja" ? MAX_RUN_DAYS : MAX_RUN_DAYS - 1;
   const targetSessions = Math.min(maxDays, Math.max(3, Math.ceil(targetKm / typicalKm)));
 
   if (pace.inZoneShare !== null && pace.inZoneShare < 0.6) {
@@ -609,7 +728,7 @@ export function buildWeekPlan(
   if (chosen.length) {
     const longCap = longest > 0 ? Math.max(longest * 1.1, longest + 1) : 5;
     const longDay =
-      chosen.length >= 2 && fatigue !== "alta"
+      chosen.length >= 2 && weekFatigue !== "alta"
         ? [...chosen].reverse().find((d) => d >= 5) ?? chosen[chosen.length - 1]
         : null;
 
@@ -626,7 +745,7 @@ export function buildWeekPlan(
     // falta más volumen, ese día va en doble (dos sesiones cortas). Con deriva
     // de pulso alta no se estira más allá de lo habitual.
     const easyCap = Math.max(MIN_SESSION_KM, round05(typicalKm * (drift !== null && drift > 5 ? 1 : 1.2)));
-    let doublesLeft = fatigue !== "alta" && baseKm >= 12 ? MAX_DOUBLES : 0;
+    let doublesLeft = weekFatigue !== "alta" && baseKm >= 12 ? MAX_DOUBLES : 0;
 
     for (const d of chosen) {
       let kind: SessionKind = d === longDay ? "long" : "easy";
@@ -635,7 +754,7 @@ export function buildWeekPlan(
         kind = "recovery";
         kmD = Math.max(MIN_SESSION_KM, round05(kmD * 0.75));
       }
-      if (kind === "easy" && fatigue === "alta") {
+      if (kind === "easy" && weekFatigue === "alta") {
         kind = "recovery";
         kmD = Math.max(MIN_SESSION_KM, round05(kmD * 0.85));
       }
@@ -720,6 +839,11 @@ export function buildWeekPlan(
       "Para sumar volumen sin alargar cada salida, algunos días van en doble: dos trotes cortos en el día suman el mismo tiempo en zona 2 con menos deriva de pulso y menos impacto.",
     );
   }
+  if (fatigue === "alta" && weekFatigue !== "alta" && kmOn(todayISO) === 0) {
+    reasons.push(
+      "Hoy tus señales piden descanso, pero la meta de la semana se mantiene: se reparte en los días que quedan.",
+    );
+  }
   if (doneDays.size >= targetSessions && remainingKm > 0) {
     reasons.push("Ya completaste los días de trote de esta semana; el resto es opcional.");
   }
@@ -754,6 +878,8 @@ export function buildWeekPlan(
     doneKm: Math.round(doneKm * 100) / 100,
     doneSessions: doneDays.size,
     fatigue,
+    weekFatigue,
+    weekReview,
     todayHeadline,
     todayDetail,
     days,
