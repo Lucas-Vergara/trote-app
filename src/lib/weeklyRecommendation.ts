@@ -566,6 +566,16 @@ export function buildWeekPlan(
   // `checkpoint`: el estado al despertar ese día (sin lo que se trotó ese día),
   // para que la meta de la semana no cambie según la hora en que mires.
   const chronic = mean(weeks.map((w) => w.km));
+  // Forma de Intervals.icu (CTL − ATL) al día `day`; con `before`, la del día
+  // anterior (estado al despertar). null si no hay datos de hace ≤ 2 días.
+  const formaAt = (day: Date, before: boolean): number | null => {
+    const iso = toISO(day);
+    const row = [...(intervals?.wellness ?? [])]
+      .reverse()
+      .find((w) => w.ctl !== null && w.atl !== null && (before ? w.date < iso : w.date <= iso));
+    if (!row || daysBetween(row.date, iso) > 2) return null;
+    return (row.ctl as number) - (row.atl as number);
+  };
   const streakAt = (day: Date, includeDay: boolean) => {
     let n = 0;
     for (
@@ -597,13 +607,16 @@ export function buildWeekPlan(
         return d >= from && (checkpoint ? d < day : d <= day);
       })
       .reduce((s, r) => s + r.km, 0);
+    // Con la Forma de Intervals (que mide la carga real, no solo los km) esta
+    // señal queda como referencia; sin ella, cuenta como señal de carga.
     if (chronic > 0) {
       const ratio = last7 / chronic;
+      const hasForma = formaAt(day, checkpoint) !== null;
       out.push({
         label: "Últimos 7 días",
         value: `${fmtKm(last7)} km`,
-        level: ratio > 1.5 ? "bad" : ratio > 1.3 ? "warn" : "ok",
-        group: "carga",
+        level: hasForma ? "info" : ratio > 1.5 ? "bad" : ratio > 1.3 ? "warn" : "ok",
+        group: hasForma ? undefined : "carga",
         hint: `${Math.round(ratio * 100)}% de tu promedio semanal`,
       });
     }
@@ -640,16 +653,45 @@ export function buildWeekPlan(
   const pace = analyzePace(runs, goal, restHR, today);
 
   // --- Volumen de la semana ---
-  // Lo que más mejora el ritmo a un mismo pulso es acumular tiempo en zona 2:
-  // mientras no llegues al objetivo, el volumen sube de a poco cada semana.
+  // Lo que más mejora el ritmo a un mismo pulso es acumular tiempo en zona 2,
+  // aunque sea lento: mientras no llegues al objetivo y estés recuperado, la
+  // meta crece cada semana sobre lo que realmente trotaste.
+  //  - Punto de partida: lo más alto entre la semana pasada, el promedio de 4
+  //    semanas y el promedio ponderado de 3 (una semana floja no lo hunde).
+  //  - Si estás bajo un volumen que ya sostuviste (mejor bloque de 3 semanas
+  //    de las últimas 11), se sube ~15%: volver a él es seguro.
+  //  - En terreno nuevo, ~10% por semana; tras 3 semanas subiendo, descarga.
+  //  - Tope: 1,2× tu promedio de 4 semanas, para no saltar de golpe.
   const reasons: string[] = [];
+  const provenKm = Math.max(
+    0,
+    ...history.slice(2).map((_, i) => mean(history.slice(i, i + 3).map((w) => w.km))),
+  );
+  const startKm = Math.max(baseKm, chronic, weeks[0].km);
+  const belowProven = startKm < provenKm * 0.95;
   let targetKm: number;
   if (!hasHistory || baseKm < MIN_SESSION_KM) {
     targetKm = 9;
     reasons.push("Con poco historial reciente, la semana parte suave: trotes cortos de unos 3 km.");
   } else {
-    const building = weeks[0].km > weeks[1].km && weeks[1].km > weeks[2].km;
-    let factor = 1.08;
+    // Con Intervals, la Forma al empezar la semana (zonas de Intervals.icu)
+    // regula cuánto subir: fresco (> +5) aguanta más; zona gris (−10 a +5),
+    // lo normal; carga productiva (−10 a −30), se sube poco y desde −20 se
+    // mantiene; bajo −30 (riesgo), descarga. Sin Intervals, la descarga va
+    // tras 3 semanas subiendo.
+    const formaWeek = formaAt(weekStart, true);
+    const building =
+      formaWeek !== null
+        ? formaWeek < -30
+        : weeks[0].km > weeks[1].km && weeks[1].km > weeks[2].km && !belowProven;
+    let factor =
+      formaWeek !== null && formaWeek < -20
+        ? 1
+        : formaWeek !== null && formaWeek < -10
+          ? 1.05
+          : belowProven || (formaWeek !== null && formaWeek > 5)
+            ? 1.15
+            : 1.1;
     const when =
       weekReview === "lunes"
         ? "Al empezar la semana"
@@ -657,21 +699,43 @@ export function buildWeekPlan(
     if (weekFatigue === "alta") {
       factor = 0.8;
       reasons.push(`${when} tus señales de cansancio estaban altas, así que la semana baja ~20% de volumen.`);
+    } else if (building) {
+      factor = 0.85;
+      reasons.push(
+        formaWeek !== null
+          ? `Tu Forma en Intervals empezó la semana en ${Math.round(formaWeek)} (bajo −30, zona de riesgo): toca descarga (~15% menos) para asimilar.`
+          : "Llevas 3 semanas subiendo volumen seguidas: esta semana toca descarga (~15% menos) para asimilar.",
+      );
     } else if (weekFatigue === "moderada") {
       factor = 1;
       reasons.push(`${when} había alguna señal de cansancio, así que se mantiene el volumen en vez de subirlo.`);
-    } else if (building) {
-      factor = 0.85;
-      reasons.push("Llevas 3 semanas subiendo volumen seguidas: esta semana toca descarga (~15% menos) para asimilar.");
+    } else if (factor === 1) {
+      reasons.push(
+        `Tu Forma en Intervals empezó la semana en ${Math.round(formaWeek as number)}: estás en carga productiva, cerca del límite, así que se mantiene el volumen.`,
+      );
     } else if (pace.reached) {
       factor = 1;
       reasons.push("Ya rindes el ritmo objetivo: se mantiene el volumen para consolidarlo.");
-    } else {
+    }
+    const base = factor >= 1 ? startKm : baseKm;
+    targetKm = Math.min(base * factor, Math.max(base, chronic * 1.2));
+    if (factor > 1) {
+      const capped = targetKm < base * factor;
+      const growth = capped
+        ? `la meta sube a ${fmtKm(round05(targetKm))} km (tope: 1,2× tu promedio de 4 semanas, para no saltar de golpe)`
+        : `la meta sube ~${Math.round((factor - 1) * 100)}% sobre las ${fmtKm(round05(base))} km de tu volumen reciente`;
+      const proven =
+        formaWeek !== null && formaWeek < -10
+          ? `, aunque tu Forma en Intervals (${Math.round(formaWeek)}) muestra que estás absorbiendo carga`
+          : formaWeek !== null && formaWeek > 5
+            ? ` y tu Forma en Intervals está en +${Math.round(formaWeek)} (fresco)`
+            : belowProven
+              ? ` y ya sostuviste ~${fmtKm(round05(provenKm))} km por semana`
+              : "";
       reasons.push(
-        `${when} venías bien recuperado: se sube ~8% sobre tu volumen reciente. Más tiempo en zona 2 es lo que te acerca a ${formatPace(goal.pace)} min/km.`,
+        `${when} venías bien recuperado${proven}: ${growth}. Más tiempo en zona 2, aunque sea lento, es lo que te acerca a ${formatPace(goal.pace)} min/km.`,
       );
     }
-    targetKm = baseKm * factor;
   }
   targetKm = Math.max(MIN_SESSION_KM, round05(targetKm));
 
@@ -692,7 +756,7 @@ export function buildWeekPlan(
     );
   }
   const maxDays = weekFatigue === "baja" ? MAX_RUN_DAYS : MAX_RUN_DAYS - 1;
-  const targetSessions = Math.min(maxDays, Math.max(3, Math.ceil(targetKm / typicalKm)));
+  const targetSessions = Math.min(maxDays, Math.max(3, Math.ceil(targetKm / typicalKm - 0.15)));
 
   if (pace.inZoneShare !== null && pace.inZoneShare < 0.6) {
     reasons.push(
@@ -716,11 +780,17 @@ export function buildWeekPlan(
     candidates.push(i);
   }
 
+  // Un trote muy corto rinde poco: ninguno baja de ~60% de tu trote típico.
+  // Si no alcanza para todos, mejor menos trotes de un largo útil.
+  const minUseful = Math.max(MIN_SESSION_KM, round05(typicalKm * 0.6));
   remainingSessions = Math.min(
     remainingSessions,
     maxDays - doneDays.size,
-    Math.floor(remainingKm / MIN_SESSION_KM),
+    Math.floor(remainingKm / minUseful),
   );
+  if (remainingSessions === 0 && remainingKm >= MIN_SESSION_KM && doneDays.size < maxDays) {
+    remainingSessions = 1;
+  }
   const chosen = chooseDays(candidates, remainingSessions, ranBefore);
 
   // Fondo largo: el día de fin de semana elegido (o el último), si quedan 2+ trotes
@@ -732,14 +802,19 @@ export function buildWeekPlan(
         ? [...chosen].reverse().find((d) => d >= 5) ?? chosen[chosen.length - 1]
         : null;
 
+    const others = chosen.filter((d) => d !== longDay);
     let longKm = 0;
     if (longDay !== null) {
-      longKm = Math.min(longCap, (remainingKm / chosen.length) * 1.4);
-      longKm = Math.max(MIN_SESSION_KM, round05(longKm));
+      // El fondo no se lleva tanto que los otros días queden bajo el mínimo útil
+      longKm = Math.min(
+        longCap,
+        (remainingKm / chosen.length) * 1.4,
+        remainingKm - others.length * minUseful,
+      );
+      longKm = Math.max(minUseful, round05(longKm));
     }
-    const others = chosen.filter((d) => d !== longDay);
     const otherKm = others.length
-      ? Math.max(MIN_SESSION_KM, round05((remainingKm - longKm) / others.length))
+      ? Math.max(minUseful, round05((remainingKm - longKm) / others.length))
       : 0;
     // Un rodaje no debería ser mucho más largo que tu trote típico; si hace
     // falta más volumen, ese día va en doble (dos sesiones cortas). Con deriva
@@ -781,6 +856,56 @@ export function buildWeekPlan(
         minutes: round5(kmD * easyPace * (kind === "recovery" ? 1.03 : 1)),
         parts,
       });
+    }
+  }
+
+  // --- Margen por frescura ---
+  // La meta semanal es fija, pero si hoy amaneces fresco el trote de hoy puede
+  // ser uno normal aunque la semana pase un poco la meta (hasta +15%), siempre
+  // que la carga lo aguante: con Intervals, Forma al despertar de −20 o más
+  // (un trote suave la baja unos 5–8 puntos, sin llegar a la zona de riesgo
+  // bajo −30); sin Intervals, últimos 7 días bajo 1,3× tu promedio semanal.
+  const todayRun = sessions.get(todayIdx);
+  const formaToday = formaAt(today, true);
+  if (
+    todayRun &&
+    !todayRun.parts &&
+    todayRun.kind !== "long" &&
+    fatigue === "baja" &&
+    weekFatigue !== "alta" &&
+    hasHistory
+  ) {
+    const plannedSoFar = [...sessions.values()].reduce((s, x) => s + x.km, 0);
+    const weekRoom = targetKm * 1.15 - doneKm - plannedSoFar;
+    const last7Before = runs
+      .filter((r) => {
+        const d = parse(r.date);
+        return d >= addDays(today, -6) && d < today;
+      })
+      .reduce((s, r) => s + r.km, 0);
+    const safeRoom =
+      formaToday !== null
+        ? formaToday >= -20
+          ? Infinity
+          : 0
+        : chronic > 0
+          ? chronic * 1.3 - last7Before - todayRun.km
+          : 0;
+    const easyCap = Math.max(MIN_SESSION_KM, round05(typicalKm * (drift !== null && drift > 5 ? 1 : 1.2)));
+    const boosted = round05(
+      Math.min(typicalKm, easyCap, todayRun.km + Math.max(0, Math.min(weekRoom, safeRoom))),
+    );
+    if (boosted >= todayRun.km + 1) {
+      sessions.set(todayIdx, {
+        ...todayRun,
+        kind: "easy",
+        title: "Rodaje zona 2",
+        km: boosted,
+        minutes: round5(boosted * easyPace),
+      });
+      reasons.push(
+        `Hoy tus señales están bien: el trote de hoy sube de ${fmtKm(todayRun.km)} a ${fmtKm(boosted)} km (un trote normal para ti), aunque la semana pase un poco la meta.`,
+      );
     }
   }
 
